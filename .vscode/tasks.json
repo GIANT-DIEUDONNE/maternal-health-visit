@@ -1,0 +1,11 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "Live Preview",
+			"workspacePath": "d:\\YEAR FOUR NOTES [2026-2027]\\SEMESTER ONE\\CLIENT SERVER\\PROJECT",
+			"problemMatcher": [],
+			"label": "Live Preview: Run Server"
+		}
+	]
+}
