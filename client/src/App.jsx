@@ -2,7 +2,8 @@ import { useCallback, useEffect, useId, useState } from "react";
 import { Link, Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import { api } from "./api.js";
 
-const SUPPORT_PHONE = "0790684556";
+const SUPPORT_PHONE = "+250790684556";
+const SUPPORT_EMAIL = "support@maternalhealth.rw";
 
 function readSession() {
   try {
@@ -413,28 +414,63 @@ function Dashboard({ session, visitReminder }) {
   const missedCount = missed.reduce((sum, item) => sum + item.missedVisits.length, 0);
 
   return (
-    <main className="page-wrap dashboard-page">
-      <div className="page-heading dashboard-heading">
-        <div><span className="eyebrow">YOUR CARE OVERVIEW</span><h1>{session.user.role === "nurse" ? "Good morning, care team." : `Welcome, ${session.user.name.split(" ")[0]}.`}</h1><p>{session.user.role === "nurse" ? "Here’s the latest across your maternal care list." : "Here’s your personalized visit plan."}</p></div>
-        {session.user.role === "nurse" && <Link className="button button-primary" to="/mothers/new"><span className="plus">+</span> Add a mother</Link>}
+    <div className="dashboard-shell">
+      <main className="page-wrap dashboard-page">
+        <div className="page-heading dashboard-heading">
+          <div><span className="eyebrow">YOUR CARE OVERVIEW</span><h1>{session.user.role === "nurse" ? "Good morning, care team." : `Welcome, ${session.user.name.split(" ")[0]}.`}</h1><p>{session.user.role === "nurse" ? "Here’s the latest across your maternal care list." : "Here’s your personalized visit plan."}</p></div>
+          {session.user.role === "nurse" && <Link className="button button-primary" to="/mothers/new"><span className="plus">+</span> Add a mother</Link>}
+        </div>
+        {session.user.role === "mother" && <VisitReminder state={visitReminder} />}
+        {session.user.role === "nurse" && (
+          <div className="summary-grid">
+            <SummaryCard label="MOTHERS IN CARE" value={result.pagination?.total ?? "—"} caption="Across your care list" icon="♡" />
+            <SummaryCard label="VISITS TO FOLLOW UP" value={analyticsError ? "—" : missedCount} caption="Past scheduled dates" icon="↗" tone="peach" />
+            <SummaryCard label="CARE PLANS" value={result.pagination?.total ?? "—"} caption="Active pregnancy journeys" icon="✳" tone="lavender" />
+          </div>
+        )}
+        {session.user.role === "nurse" && missed.length > 0 && <div className="notice"><span>!</span><p><strong>{missed.length} {missed.length === 1 ? "mother has" : "mothers have"} visits to follow up.</strong> Review their care plans below.</p></div>}
+        <div className="section-heading dashboard-section-heading"><div><h2>{session.user.role === "nurse" ? "Mother care plans" : "Your care plan"}</h2><p>{session.user.role === "nurse" ? "A clear view of each journey and next step." : "Your visits, thoughtfully planned around your due date."}</p></div><span className="results-count">{result.pagination?.total ?? 0} {result.pagination?.total === 1 ? "profile" : "profiles"}</span></div>
+        {result.loading ? <LoadingState text="Loading care plans..." /> : result.error ? <ErrorState message={result.error} retry={load} /> : result.data.length === 0 ? <EmptyState title="No care plans yet" body={session.user.role === "nurse" ? "Add a mother to start tracking her visits." : "Your care plan will appear here."} /> : (
+          <div className="mother-grid">
+            {result.data.map((mother) => <MotherCard key={mother._id} mother={mother} token={session.token} />)}
+          </div>
+        )}
+        {!result.loading && result.pagination?.pages > 1 && <div className="pagination"><button className="button button-outline" disabled={page === 1} onClick={() => setPage(page - 1)}>← Previous</button><span>Page {page} of {result.pagination.pages}</span><button className="button button-outline" disabled={page === result.pagination.pages} onClick={() => setPage(page + 1)}>Next →</button></div>}
+      </main>
+      <DashboardContact />
+    </div>
+  );
+}
+
+function DashboardContact() {
+  return (
+    <footer className="dashboard-contact">
+      <div className="dashboard-contact-inner">
+        <div className="dashboard-contact-details">
+          <strong>Contact Us:</strong>
+          <div className="dashboard-contact-links">
+            <a href={`mailto:${SUPPORT_EMAIL}`}>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v12H4zM4 7l8 6 8-6" /></svg>
+              <span>{SUPPORT_EMAIL}</span>
+            </a>
+            <a href={`tel:${SUPPORT_PHONE}`}>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3H4a1 1 0 0 0-1 1c0 9.4 7.6 17 17 17a1 1 0 0 0 1-1v-3l-5-2-2 3a14 14 0 0 1-7-7l3-2-2-5z" /></svg>
+              <span>{SUPPORT_PHONE}</span>
+            </a>
+          </div>
+        </div>
+        <div className="dashboard-socials" role="group" aria-label="Social media">
+          <span className="dashboard-social-icon" role="img" aria-label="Facebook">f</span>
+          <span className="dashboard-social-icon" role="img" aria-label="Twitter">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 5.9a8 8 0 0 1-2.4.7 4.2 4.2 0 0 0 1.8-2.3 8.3 8.3 0 0 1-2.7 1 4.2 4.2 0 0 0-7.2 3.8 12 12 0 0 1-8.7-4.4 4.2 4.2 0 0 0 1.3 5.6 4.1 4.1 0 0 1-1.9-.5v.1a4.2 4.2 0 0 0 3.4 4.1 4 4 0 0 1-1.9.1 4.2 4.2 0 0 0 3.9 2.9A8.4 8.4 0 0 1 1 18.7a11.8 11.8 0 0 0 6.4 1.9c7.7 0 11.9-6.4 11.9-11.9v-.5A8.5 8.5 0 0 0 22 5.9z" /></svg>
+          </span>
+          <span className="dashboard-social-icon" role="img" aria-label="YouTube">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 8a3 3 0 0 0-2-2.1C18.2 5.4 12 5.4 12 5.4s-6.2 0-8 .5A3 3 0 0 0 2 8a31 31 0 0 0-.5 4 31 31 0 0 0 .5 4 3 3 0 0 0 2 2.1c1.8.5 8 .5 8 .5s6.2 0 8-.5a3 3 0 0 0 2-2.1 31 31 0 0 0 .5-4 31 31 0 0 0-.5-4z" /><path className="dashboard-social-play" d="m10 15 5-3-5-3z" /></svg>
+          </span>
+          <span className="dashboard-social-icon dashboard-social-linkedin" role="img" aria-label="LinkedIn">in</span>
+        </div>
       </div>
-      {session.user.role === "mother" && <VisitReminder state={visitReminder} />}
-      {session.user.role === "nurse" && (
-        <div className="summary-grid">
-          <SummaryCard label="MOTHERS IN CARE" value={result.pagination?.total ?? "—"} caption="Across your care list" icon="♡" />
-          <SummaryCard label="VISITS TO FOLLOW UP" value={analyticsError ? "—" : missedCount} caption="Past scheduled dates" icon="↗" tone="peach" />
-          <SummaryCard label="CARE PLANS" value={result.pagination?.total ?? "—"} caption="Active pregnancy journeys" icon="✳" tone="lavender" />
-        </div>
-      )}
-      {session.user.role === "nurse" && missed.length > 0 && <div className="notice"><span>!</span><p><strong>{missed.length} {missed.length === 1 ? "mother has" : "mothers have"} visits to follow up.</strong> Review their care plans below.</p></div>}
-      <div className="section-heading dashboard-section-heading"><div><h2>{session.user.role === "nurse" ? "Mother care plans" : "Your care plan"}</h2><p>{session.user.role === "nurse" ? "A clear view of each journey and next step." : "Your visits, thoughtfully planned around your due date."}</p></div><span className="results-count">{result.pagination?.total ?? 0} {result.pagination?.total === 1 ? "profile" : "profiles"}</span></div>
-      {result.loading ? <LoadingState text="Loading care plans..." /> : result.error ? <ErrorState message={result.error} retry={load} /> : result.data.length === 0 ? <EmptyState title="No care plans yet" body={session.user.role === "nurse" ? "Add a mother to start tracking her visits." : "Your care plan will appear here."} /> : (
-        <div className="mother-grid">
-          {result.data.map((mother) => <MotherCard key={mother._id} mother={mother} token={session.token} />)}
-        </div>
-      )}
-      {!result.loading && result.pagination?.pages > 1 && <div className="pagination"><button className="button button-outline" disabled={page === 1} onClick={() => setPage(page - 1)}>← Previous</button><span>Page {page} of {result.pagination.pages}</span><button className="button button-outline" disabled={page === result.pagination.pages} onClick={() => setPage(page + 1)}>Next →</button></div>}
-    </main>
+    </footer>
   );
 }
 
