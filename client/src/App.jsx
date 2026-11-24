@@ -15,6 +15,7 @@ function readSession() {
 function App() {
   const [session, setSession] = useState(readSession);
   const navigate = useNavigate();
+  const visitReminder = useVisitReminder(session?.token, session?.user?.role === "mother");
   const onAuthenticated = (value) => {
     localStorage.setItem("maternal-session", JSON.stringify(value));
     setSession(value);
@@ -28,13 +29,13 @@ function App() {
 
   return (
     <div className="app-shell">
-      {session && <Header session={session} onLogout={logout} />}
+      {session && <Header session={session} onLogout={logout} visitReminder={visitReminder} />}
       <Routes>
         <Route path="/" element={session ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
         <Route path="/login" element={session ? <Navigate to="/dashboard" replace /> : <AuthPage onAuthenticated={onAuthenticated} />} />
         <Route path="/forgot-password" element={session ? <Navigate to="/dashboard" replace /> : <ForgotPasswordPage />} />
         <Route path="/register" element={session ? <Navigate to="/dashboard" replace /> : <AuthPage register onAuthenticated={onAuthenticated} />} />
-        <Route path="/dashboard" element={<Protected session={session}><Dashboard session={session} /></Protected>} />
+        <Route path="/dashboard" element={<Protected session={session}><Dashboard session={session} visitReminder={visitReminder} /></Protected>} />
         <Route path="/mothers/new" element={<Protected session={session} role="nurse"><MotherForm session={session} /></Protected>} />
         <Route path="/mothers/:id" element={<Protected session={session}><MotherDetail session={session} /></Protected>} />
         <Route path="*" element={<Navigate to={session ? "/dashboard" : "/"} replace />} />
@@ -153,11 +154,60 @@ function Protected({ session, role, children }) {
   return children;
 }
 
-function Header({ session, onLogout }) {
+function useVisitReminder(token, enabled) {
+  const [state, setState] = useState({ loading: false, error: "", visit: null });
+  useEffect(() => {
+    let active = true;
+    if (!enabled || !token) {
+      setState({ loading: false, error: "", visit: null });
+      return () => { active = false; };
+    }
+
+    setState({ loading: true, error: "", visit: null });
+    api("/visits?page=1&limit=100", { token })
+      .then(({ data }) => {
+        const tomorrow = startOfUtcDay(new Date()).getTime() + 86400000;
+        const visit = data.find((item) => !item.completedAt && startOfUtcDay(item.visitDate).getTime() === tomorrow);
+        if (active) setState({ loading: false, error: "", visit: visit || null });
+      })
+      .catch((error) => {
+        if (active) setState({ loading: false, error: error.message, visit: null });
+      });
+    return () => { active = false; };
+  }, [enabled, token]);
+  return state;
+}
+
+function Header({ session, onLogout, visitReminder }) {
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   return (
     <header className="topbar">
       <Link to="/" className="brand"><span className="brand-mark">b</span><span>Bloom<span className="brand-muted"> / maternal care</span></span></Link>
       <div className="topbar-right">
+        {session.user.role === "mother" && <div className="notification-menu">
+          <button
+            type="button"
+            className="notification-button"
+            aria-label={visitReminder.visit ? "1 visit reminder" : "Notifications"}
+            aria-expanded={notificationsOpen}
+            aria-controls="account-notifications"
+            onClick={() => setNotificationsOpen((open) => !open)}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /></svg>
+            {visitReminder.visit && <span className="notification-count">1</span>}
+          </button>
+          {notificationsOpen && <div className="notification-popover" id="account-notifications" role="region" aria-label="Account notifications">
+            <div className="notification-popover-heading"><strong>Notifications</strong><span>{visitReminder.visit ? "1 reminder" : ""}</span></div>
+            {visitReminder.loading ? <p className="notification-empty">Checking for upcoming visits…</p>
+              : visitReminder.error ? <p className="notification-error" role="alert">Reminders could not be loaded: {visitReminder.error}</p>
+                : visitReminder.visit ? <Link className="notification-item" to={`/mothers/${visitReminder.visit.motherId}`} onClick={() => setNotificationsOpen(false)}>
+                  <span className="notification-item-icon" aria-hidden="true">♡</span>
+                  <span><strong>Your visit is tomorrow</strong><small>Visit {visitReminder.visit.visitNo} · {formatDate(visitReminder.visit.visitDate)}</small></span>
+                  <span className="notification-arrow" aria-hidden="true">→</span>
+                </Link>
+                  : <p className="notification-empty">No visit reminders right now. We’ll remind you here the day before a scheduled visit.</p>}
+          </div>}
+        </div>}
         <span className="role-pill">{session.user.role}</span>
         <span className="user-name">{session.user.name}</span>
         <button className="text-button" onClick={onLogout}>Log out</button>
@@ -339,7 +389,7 @@ function ForgotPasswordPage() {
   );
 }
 
-function Dashboard({ session }) {
+function Dashboard({ session, visitReminder }) {
   const [result, setResult] = useState({ loading: true, error: "", data: [], pagination: null });
   const [page, setPage] = useState(1);
   const [missed, setMissed] = useState([]);
@@ -368,7 +418,7 @@ function Dashboard({ session }) {
         <div><span className="eyebrow">YOUR CARE OVERVIEW</span><h1>{session.user.role === "nurse" ? "Good morning, care team." : `Welcome, ${session.user.name.split(" ")[0]}.`}</h1><p>{session.user.role === "nurse" ? "Here’s the latest across your maternal care list." : "Here’s your personalized visit plan."}</p></div>
         {session.user.role === "nurse" && <Link className="button button-primary" to="/mothers/new"><span className="plus">+</span> Add a mother</Link>}
       </div>
-      {session.user.role === "mother" && <VisitReminder token={session.token} />}
+      {session.user.role === "mother" && <VisitReminder state={visitReminder} />}
       {session.user.role === "nurse" && (
         <div className="summary-grid">
           <SummaryCard label="MOTHERS IN CARE" value={result.pagination?.total ?? "—"} caption="Across your care list" icon="♡" />
@@ -388,22 +438,7 @@ function Dashboard({ session }) {
   );
 }
 
-function VisitReminder({ token }) {
-  const [state, setState] = useState({ loading: true, error: "", visit: null });
-  useEffect(() => {
-    let active = true;
-    api("/visits?page=1&limit=100", { token })
-      .then(({ data }) => {
-        const tomorrow = startOfUtcDay(new Date()).getTime() + 86400000;
-        const visit = data.find((item) => !item.completedAt && startOfUtcDay(item.visitDate).getTime() === tomorrow);
-        if (active) setState({ loading: false, error: "", visit: visit || null });
-      })
-      .catch((error) => {
-        if (active) setState({ loading: false, error: error.message, visit: null });
-      });
-    return () => { active = false; };
-  }, [token]);
-
+function VisitReminder({ state }) {
   if (state.loading || (!state.error && !state.visit)) return null;
   if (state.error) return <div className="error-banner visit-reminder-error" role="alert">Your visit reminder could not be loaded: {state.error}</div>;
   return (
