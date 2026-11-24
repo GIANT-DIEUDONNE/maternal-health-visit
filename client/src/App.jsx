@@ -396,6 +396,16 @@ function Dashboard({ session, visitReminder }) {
   const [page, setPage] = useState(1);
   const [missed, setMissed] = useState([]);
   const [analyticsError, setAnalyticsError] = useState("");
+  const [greeting, setGreeting] = useState(getKigaliGreeting);
+  useEffect(() => {
+    const updateGreeting = () => setGreeting(getKigaliGreeting());
+    const interval = window.setInterval(updateGreeting, 60_000);
+    document.addEventListener("visibilitychange", updateGreeting);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", updateGreeting);
+    };
+  }, []);
   const load = useCallback(async () => {
     setResult((current) => ({ ...current, loading: true, error: "" }));
     try {
@@ -418,7 +428,7 @@ function Dashboard({ session, visitReminder }) {
     <div className="dashboard-shell">
       <main className="page-wrap dashboard-page">
         <div className="page-heading dashboard-heading">
-          <div><span className="eyebrow">YOUR CARE OVERVIEW</span><h1>{session.user.role === "nurse" ? "Good morning, care team." : `Welcome, ${session.user.name.split(" ")[0]}.`}</h1><p>{session.user.role === "nurse" ? "Here’s the latest across your maternal care list." : "Here’s your personalized visit plan."}</p></div>
+          <div><span className="eyebrow">YOUR CARE OVERVIEW</span><h1>{session.user.role === "nurse" ? `${greeting}, ${session.user.name.split(" ")[0]}.` : `Welcome, ${session.user.name.split(" ")[0]}.`}</h1><p>{session.user.role === "nurse" ? "Here’s the latest across your maternal care list." : "Here’s your personalized visit plan."}</p></div>
           {session.user.role === "nurse" && <Link className="button button-primary" to="/mothers/new"><span className="plus">+</span> Add a mother</Link>}
         </div>
         {session.user.role === "mother" && <VisitReminder state={visitReminder} />}
@@ -655,6 +665,17 @@ function startOfUtcDay(value) {
 }
 function formatDate(value) {
   return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(value));
+}
+
+function getKigaliGreeting(date = new Date()) {
+  const hour = Number(new Intl.DateTimeFormat("en", {
+    hour: "numeric",
+    hourCycle: "h23",
+    timeZone: "Africa/Kigali"
+  }).format(date));
+  if (hour >= 5 && hour < 12) return "Good morning";
+  if (hour >= 12 && hour < 17) return "Good afternoon";
+  return "Good evening";
 }
 
 export default App;
