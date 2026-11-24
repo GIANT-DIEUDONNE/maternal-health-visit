@@ -4,6 +4,8 @@ Maternal health visit reminders built with **React + Express + MongoDB**. The AP
 
 Mother accounts see an in-app dashboard reminder the day before a scheduled visit. It appears when they sign in; email, SMS, and browser push notifications are not configured.
 
+Password recovery is support-assisted: the Forgot password page links to `0790684556`. Automated password reset is not configured.
+
 ## Run locally
 
 1. Install Node.js and MongoDB Community Server, then start MongoDB.

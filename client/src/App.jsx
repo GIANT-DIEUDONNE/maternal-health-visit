@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import { api } from "./api.js";
 
+const SUPPORT_PHONE = "0790684556";
+
 function readSession() {
   try {
     return JSON.parse(localStorage.getItem("maternal-session") || "null");
@@ -30,6 +32,7 @@ function App() {
       <Routes>
         <Route path="/" element={session ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
         <Route path="/login" element={session ? <Navigate to="/dashboard" replace /> : <AuthPage onAuthenticated={onAuthenticated} />} />
+        <Route path="/forgot-password" element={session ? <Navigate to="/dashboard" replace /> : <ForgotPasswordPage />} />
         <Route path="/register" element={session ? <Navigate to="/dashboard" replace /> : <AuthPage register onAuthenticated={onAuthenticated} />} />
         <Route path="/dashboard" element={<Protected session={session}><Dashboard session={session} /></Protected>} />
         <Route path="/mothers/new" element={<Protected session={session} role="nurse"><MotherForm session={session} /></Protected>} />
@@ -53,6 +56,7 @@ function LandingPage() {
           <a href="#about">About</a>
           <a href="#features">Features</a>
           <a href="#how-it-works">How it works</a>
+          <a href="#contact">Contact us</a>
         </nav>
         <div className="landing-actions">
           <Link className="landing-login" to="/login">Log in</Link>
@@ -133,7 +137,10 @@ function LandingPage() {
           <span className="landing-brand-mark" aria-hidden="true">♡</span>
           <span>Maternal Health<span>Visit Reminder</span></span>
         </a>
-        <p>Thoughtful support for a healthier pregnancy journey.</p>
+        <div className="landing-footer-copy" id="contact">
+          <p>Thoughtful support for a healthier pregnancy journey.</p>
+          <p><strong>Contact us:</strong> <a href={`tel:${SUPPORT_PHONE}`}>{SUPPORT_PHONE}</a></p>
+        </div>
         <a href="#home" className="landing-back-top">Back to top ↑</a>
       </footer>
     </div>
@@ -207,7 +214,28 @@ function AuthPage({ register = false, onAuthenticated }) {
           {error && <ErrorBanner>{error}</ErrorBanner>}
           <button className="button button-primary full-width" disabled={busy}>{busy ? "Please wait..." : register ? "Create account" : "Sign in"} <span>→</span></button>
         </form>
+        {!register && <p className="forgot-password-link"><Link to="/forgot-password">Forgot your password?</Link></p>}
         <p className="auth-switch">{register ? "Already have an account?" : "New to Bloom?"} <Link to={register ? "/login" : "/register"}>{register ? "Sign in" : "Create an account"}</Link></p>
+      </section>
+    </main>
+  );
+}
+
+function ForgotPasswordPage() {
+  return (
+    <main className="auth-layout">
+      <section className="auth-intro">
+        <span className="eyebrow">ACCOUNT SUPPORT</span>
+        <h1>We’re here to help you get back in.</h1>
+        <p>Contact our support team for help recovering access to your account.</p>
+        <div className="intro-note"><span className="note-icon">✳</span><span>We’ll help you recover access safely.</span></div>
+      </section>
+      <section className="auth-card">
+        <div className="card-kicker">PASSWORD HELP</div>
+        <h2>Forgot your password?</h2>
+        <p className="form-subtitle">Automated password resets are not available yet. Call us and our support team can help you recover your account.</p>
+        <a className="button button-primary full-width contact-phone-button" href={`tel:${SUPPORT_PHONE}`}>Call {SUPPORT_PHONE}</a>
+        <p className="auth-switch"><Link to="/login">Back to sign in</Link></p>
       </section>
     </main>
   );
