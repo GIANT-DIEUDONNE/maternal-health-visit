@@ -13,32 +13,53 @@ function readSession() {
   }
 }
 
+function reminderPreferenceKey(email) {
+  return `maternal-reminders:${email}`;
+}
+
+function readReminderPreference(email) {
+  if (!email) return true;
+  try {
+    return localStorage.getItem(reminderPreferenceKey(email)) !== "false";
+  } catch {
+    return true;
+  }
+}
+
 function App() {
   const [session, setSession] = useState(readSession);
+  const [remindersEnabled, setRemindersEnabled] = useState(() => readReminderPreference(session?.user?.email));
   const location = useLocation();
   const navigate = useNavigate();
-  const onDashboard = location.pathname === "/dashboard";
-  const visitReminder = useVisitReminder(session?.token, session?.user?.role === "mother");
+  const dashboardArea = ["/dashboard", "/settings"].includes(location.pathname);
+  const visitReminder = useVisitReminder(session?.token, session?.user?.role === "mother", remindersEnabled);
   const onAuthenticated = (value) => {
     localStorage.setItem("maternal-session", JSON.stringify(value));
     setSession(value);
+    setRemindersEnabled(readReminderPreference(value.user.email));
     navigate("/dashboard");
   };
   const logout = () => {
     localStorage.removeItem("maternal-session");
     setSession(null);
+    setRemindersEnabled(true);
     navigate("/login");
+  };
+  const updateReminderPreference = (enabled) => {
+    localStorage.setItem(reminderPreferenceKey(session.user.email), String(enabled));
+    setRemindersEnabled(enabled);
   };
 
   return (
     <div className="app-shell">
-      {session && !onDashboard && <Header session={session} onLogout={logout} visitReminder={visitReminder} />}
+      {session && !dashboardArea && <Header session={session} onLogout={logout} visitReminder={visitReminder} />}
       <Routes>
         <Route path="/" element={session ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
         <Route path="/login" element={session ? <Navigate to="/dashboard" replace /> : <AuthPage onAuthenticated={onAuthenticated} />} />
         <Route path="/forgot-password" element={session ? <Navigate to="/dashboard" replace /> : <ForgotPasswordPage />} />
         <Route path="/register" element={session ? <Navigate to="/dashboard" replace /> : <AuthPage register onAuthenticated={onAuthenticated} />} />
         <Route path="/dashboard" element={<Protected session={session}><Dashboard session={session} visitReminder={visitReminder} onLogout={logout} /></Protected>} />
+        <Route path="/settings" element={<Protected session={session}><SettingsPage session={session} visitReminder={visitReminder} remindersEnabled={remindersEnabled} onReminderPreferenceChange={updateReminderPreference} onLogout={logout} /></Protected>} />
         <Route path="/mothers/new" element={<Protected session={session} role="nurse"><MotherForm session={session} /></Protected>} />
         <Route path="/mothers/:id" element={<Protected session={session}><MotherDetail session={session} /></Protected>} />
         <Route path="*" element={<Navigate to={session ? "/dashboard" : "/"} replace />} />
@@ -157,11 +178,11 @@ function Protected({ session, role, children }) {
   return children;
 }
 
-function useVisitReminder(token, enabled) {
+function useVisitReminder(token, isMother, remindersEnabled) {
   const [state, setState] = useState({ loading: false, error: "", visit: null, visits: [] });
   useEffect(() => {
     let active = true;
-    if (!enabled || !token) {
+    if (!isMother || !token) {
       setState({ loading: false, error: "", visit: null, visits: [] });
       return () => { active = false; };
     }
@@ -170,14 +191,16 @@ function useVisitReminder(token, enabled) {
     api("/visits?page=1&limit=100", { token })
       .then(({ data }) => {
         const tomorrow = startOfUtcDay(new Date()).getTime() + 86400000;
-        const visit = data.find((item) => !item.completedAt && startOfUtcDay(item.visitDate).getTime() === tomorrow);
+        const visit = remindersEnabled
+          ? data.find((item) => !item.completedAt && startOfUtcDay(item.visitDate).getTime() === tomorrow)
+          : null;
         if (active) setState({ loading: false, error: "", visit: visit || null, visits: data });
       })
       .catch((error) => {
         if (active) setState({ loading: false, error: error.message, visit: null, visits: [] });
       });
     return () => { active = false; };
-  }, [enabled, token]);
+  }, [isMother, remindersEnabled, token]);
   return state;
 }
 
@@ -432,7 +455,7 @@ function Dashboard({ session, visitReminder, onLogout }) {
 
   return (
     <div className={`dashboard-layout dashboard-role-${session.user.role}`}>
-      <DashboardSidebar session={session} missedCount={missedCount} motherId={result.data[0]?._id} onLogout={onLogout} />
+      <DashboardSidebar session={session} activePage="dashboard" missedCount={missedCount} motherId={result.data[0]?._id} onLogout={onLogout} />
       <div className="dashboard-main">
         <Header session={session} onLogout={onLogout} visitReminder={visitReminder} dashboard />
         <div className="dashboard-workspace">
@@ -472,8 +495,83 @@ function Dashboard({ session, visitReminder, onLogout }) {
   );
 }
 
-function DashboardSidebar({ session, missedCount, motherId, onLogout }) {
+function SettingsPage({ session, visitReminder, remindersEnabled, onReminderPreferenceChange, onLogout }) {
+  const [preferenceError, setPreferenceError] = useState("");
+  const updateReminderPreference = (enabled) => {
+    setPreferenceError("");
+    try {
+      onReminderPreferenceChange(enabled);
+    } catch {
+      setPreferenceError("Your reminder preference could not be saved. Check your browser storage and try again.");
+    }
+  };
+  const initials = session.user.name.split(/\s+/).map((part) => part[0]).slice(0, 2).join("").toUpperCase();
+
+  return (
+    <div className={`dashboard-layout dashboard-role-${session.user.role}`}>
+      <DashboardSidebar session={session} activePage="settings" missedCount={0} onLogout={onLogout} />
+      <div className="dashboard-main">
+        <Header session={session} onLogout={onLogout} visitReminder={visitReminder} dashboard />
+        <div className="dashboard-workspace">
+          <main className="page-wrap dashboard-page settings-page">
+            <div className="settings-page-heading">
+              <span className="eyebrow">ACCOUNT PREFERENCES</span>
+              <h1>Settings</h1>
+              <p>Manage your account details and visit reminder preferences.</p>
+            </div>
+            <section className="settings-card" aria-labelledby="account-details-title">
+              <div className="settings-card-heading">
+                <span className="settings-card-icon" aria-hidden="true">♙</span>
+                <div><h2 id="account-details-title">Account details</h2><p>Your registered account information.</p></div>
+              </div>
+              <div className="settings-profile">
+                <span className="settings-avatar" aria-hidden="true">{initials}</span>
+                <div><strong>{session.user.name}</strong><span>{session.user.role === "nurse" ? "Nurse account" : "Mother account"}</span></div>
+              </div>
+              <dl className="settings-details">
+                <div><dt>Email address</dt><dd>{session.user.email}</dd></div>
+                <div><dt>Account role</dt><dd>{session.user.role === "nurse" ? "Nurse" : "Mother"}</dd></div>
+                {session.user.phone && <div><dt>Phone number</dt><dd>{session.user.phone}</dd></div>}
+              </dl>
+            </section>
+            <section className="settings-card" aria-labelledby="reminder-settings-title">
+              <div className="settings-card-heading">
+                <span className="settings-card-icon settings-reminder-icon" aria-hidden="true">♧</span>
+                <div><h2 id="reminder-settings-title">{session.user.role === "mother" ? "Visit reminders" : "Care follow-ups"}</h2><p>{session.user.role === "mother" ? "Choose whether to show scheduled visit reminders in your account." : "Follow-up alerts for missed visits are shown on your nurse dashboard."}</p></div>
+              </div>
+              {session.user.role === "mother" ? <>
+                <div className="settings-toggle-row">
+                  <div><strong>In-app visit reminders</strong><span>Show a notification the day before an appointment.</span></div>
+                  <button
+                    className="settings-switch"
+                    type="button"
+                    role="switch"
+                    aria-checked={remindersEnabled}
+                    aria-label="In-app visit reminders"
+                    onClick={() => updateReminderPreference(!remindersEnabled)}
+                  ><span /></button>
+                </div>
+                {preferenceError && <p className="settings-error" role="alert">{preferenceError}</p>}
+              </> : <p className="settings-info">Missed appointments remain visible on your dashboard so you can follow up with mothers in your care.</p>}
+            </section>
+            <section className="settings-support">
+              <div><strong>Need help with your account?</strong><span>Contact our support team for assistance.</span></div>
+              <a href={`mailto:${SUPPORT_EMAIL}`}>Contact support <span aria-hidden="true">→</span></a>
+            </section>
+          </main>
+          <ContactStrip />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DashboardSidebar({ session, activePage, missedCount, motherId, onLogout }) {
   const isNurse = session.user.role === "nurse";
+  const carePlansPath = activePage === "settings" ? "/dashboard#care-plans" : "#care-plans";
+  const appointmentsPath = activePage === "settings"
+    ? `/dashboard#${isNurse ? "follow-ups" : "appointments"}`
+    : `#${isNurse ? "follow-ups" : "appointments"}`;
   return (
     <aside className="dashboard-sidebar">
       <Link to="/dashboard" className="sidebar-brand">
@@ -481,14 +579,18 @@ function DashboardSidebar({ session, missedCount, motherId, onLogout }) {
         <span>Maternal Health<small>Visit Reminder</small></span>
       </Link>
       <nav className="sidebar-nav" aria-label="Dashboard navigation">
-        <Link className="sidebar-link active" to="/dashboard"><span aria-hidden="true">⌂</span>Dashboard</Link>
-        <a className="sidebar-link" href="#care-plans"><span aria-hidden="true">▤</span>{isNurse ? "Mother care plans" : "My care plan"}</a>
-        <a className="sidebar-link" href={isNurse ? "#follow-ups" : "#appointments"}><span aria-hidden="true">▦</span>Appointments{isNurse && missedCount > 0 && <span className="sidebar-badge">{missedCount}</span>}</a>
+        <Link className={`sidebar-link${activePage === "dashboard" ? " active" : ""}`} to="/dashboard"><span aria-hidden="true">⌂</span>Dashboard</Link>
+        {activePage === "settings"
+          ? <Link className="sidebar-link" to={carePlansPath}><span aria-hidden="true">▤</span>{isNurse ? "Mother care plans" : "My care plan"}</Link>
+          : <a className="sidebar-link" href={carePlansPath}><span aria-hidden="true">▤</span>{isNurse ? "Mother care plans" : "My care plan"}</a>}
+        {activePage === "settings"
+          ? <Link className="sidebar-link" to={appointmentsPath}><span aria-hidden="true">▦</span>Appointments{isNurse && missedCount > 0 && <span className="sidebar-badge">{missedCount}</span>}</Link>
+          : <a className="sidebar-link" href={appointmentsPath}><span aria-hidden="true">▦</span>Appointments{isNurse && missedCount > 0 && <span className="sidebar-badge">{missedCount}</span>}</a>}
         {isNurse
           ? <a className="sidebar-link" href="#care-plans"><span aria-hidden="true">▣</span>Health Records</a>
           : <Link className="sidebar-link" to={motherId ? `/mothers/${motherId}` : "/dashboard#care-plans"}><span aria-hidden="true">▣</span>Health Records</Link>}
         <a className="sidebar-link" href={`mailto:${SUPPORT_EMAIL}`}><span aria-hidden="true">✉</span>Messages</a>
-        <button className="sidebar-link sidebar-disabled" type="button" disabled title="Settings are not available yet."><span aria-hidden="true">⚙</span>Settings</button>
+        <Link className={`sidebar-link${activePage === "settings" ? " active" : ""}`} to="/settings"><span aria-hidden="true">⚙</span>Settings</Link>
         <button className="sidebar-link sidebar-menu-logout" type="button" onClick={onLogout}><span aria-hidden="true">⇥</span>Log out</button>
       </nav>
       <div className="sidebar-bottom">
