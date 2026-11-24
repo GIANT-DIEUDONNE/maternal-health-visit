@@ -460,14 +460,16 @@ function DashboardContact() {
           </div>
         </div>
         <div className="dashboard-socials" role="group" aria-label="Social media">
-          <span className="dashboard-social-icon" role="img" aria-label="Facebook">f</span>
-          <span className="dashboard-social-icon" role="img" aria-label="Twitter">
+          <a className="dashboard-social-icon" href="https://www.facebook.com/" target="_blank" rel="noopener noreferrer" aria-label="Facebook" title="Facebook">
+            f
+          </a>
+          <a className="dashboard-social-icon" href="https://x.com/" target="_blank" rel="noopener noreferrer" aria-label="Twitter / X" title="Twitter / X">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 5.9a8 8 0 0 1-2.4.7 4.2 4.2 0 0 0 1.8-2.3 8.3 8.3 0 0 1-2.7 1 4.2 4.2 0 0 0-7.2 3.8 12 12 0 0 1-8.7-4.4 4.2 4.2 0 0 0 1.3 5.6 4.1 4.1 0 0 1-1.9-.5v.1a4.2 4.2 0 0 0 3.4 4.1 4 4 0 0 1-1.9.1 4.2 4.2 0 0 0 3.9 2.9A8.4 8.4 0 0 1 1 18.7a11.8 11.8 0 0 0 6.4 1.9c7.7 0 11.9-6.4 11.9-11.9v-.5A8.5 8.5 0 0 0 22 5.9z" /></svg>
-          </span>
-          <span className="dashboard-social-icon" role="img" aria-label="YouTube">
+          </a>
+          <a className="dashboard-social-icon" href="https://www.youtube.com/" target="_blank" rel="noopener noreferrer" aria-label="YouTube" title="YouTube">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 8a3 3 0 0 0-2-2.1C18.2 5.4 12 5.4 12 5.4s-6.2 0-8 .5A3 3 0 0 0 2 8a31 31 0 0 0-.5 4 31 31 0 0 0 .5 4 3 3 0 0 0 2 2.1c1.8.5 8 .5 8 .5s6.2 0 8-.5a3 3 0 0 0 2-2.1 31 31 0 0 0 .5-4 31 31 0 0 0-.5-4z" /><path className="dashboard-social-play" d="m10 15 5-3-5-3z" /></svg>
-          </span>
-          <span className="dashboard-social-icon dashboard-social-linkedin" role="img" aria-label="LinkedIn">in</span>
+          </a>
+          <a className="dashboard-social-icon dashboard-social-linkedin" href="https://www.linkedin.com/" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn" title="LinkedIn">in</a>
         </div>
       </div>
     </footer>
