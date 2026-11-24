@@ -190,10 +190,10 @@ function AuthPage({ register = false, onAuthenticated }) {
     }
   };
   const formCard = (
-    <section className={register ? "auth-card" : "login-card"}>
+    <section className={register ? "login-card signup-card" : "login-card"}>
       {!register && <span className="login-lock" aria-hidden="true">🔒</span>}
-      {register && <div className="card-kicker">CREATE YOUR ACCOUNT</div>}
-      <h2>{register ? "Join Bloom" : "Welcome Back"}</h2>
+      {register && <div className="signup-kicker">PERSONALIZED MATERNAL CARE</div>}
+      <h2>{register ? "Create your account" : "Welcome Back"}</h2>
       <p className="form-subtitle">{register ? values.role === "nurse" ? "Nurse registration requires a clinic invite code and a phone number for account recovery." : "Create your mother account to view your care plan." : "Sign in to continue to your care dashboard."}</p>
       <form onSubmit={submit} className="form-stack">
         {register && <Field label="Full name" value={values.name} onChange={(name) => setValues({ ...values, name })} required />}
@@ -211,64 +211,50 @@ function AuthPage({ register = false, onAuthenticated }) {
     </section>
   );
 
-  if (!register) {
-    return (
-      <div className="login-page">
-        <header className="login-header">
-          <Link className="login-brand" to="/" aria-label="Maternal Health Visit Reminder home">
-            <span className="login-brand-mark" aria-hidden="true">♡</span>
-            <span>Maternal Health<small>Visit Reminder</small></span>
-          </Link>
-          <nav className="login-nav" aria-label="Main navigation">
-            <Link className="login-nav-active" to="/">Home</Link>
-            <Link to="/#about">About</Link>
-            <Link to="/#features">Features</Link>
-            <Link to="/#how-it-works">How It Works</Link>
-            <Link to="/#contact">Contact</Link>
-          </nav>
-          <div className="login-header-actions">
-            <Link className="login-header-signin" to="/login" aria-current="page">Sign In</Link>
-            <Link className="login-header-signup" to="/register">Sign Up</Link>
-          </div>
-        </header>
-        <main className="login-hero">
-          <div className="login-photo" role="img" aria-label="A pregnant mother meeting with a nurse for prenatal care" />
-          <section className="login-intro">
-            <span className="login-kicker"><span aria-hidden="true">♥</span> Personalized Maternal Care</span>
-            <h1>Every visit is a step toward a <span>healthier beginning.</span></h1>
-            <p>Keep care plans clear, visits on track, and your support team close.</p>
-            <ul className="login-benefits" aria-label="Care features">
-              <li><span aria-hidden="true">▦</span>Track<br />Appointments</li>
-              <li><span aria-hidden="true">♧</span>Get<br />Reminders</li>
-              <li><span aria-hidden="true">✓</span>Monitor<br />Health Progress</li>
-              <li><span aria-hidden="true">♥</span>Better Care<br />for You &amp; Baby</li>
-            </ul>
-            <p className="login-tagline">Healthy Mother. Healthy Baby. A Healthier Rwanda.</p>
-          </section>
-          {formCard}
-        </main>
-        <footer className="login-footer">
-          <Link className="login-footer-brand" to="/">
-            <span className="login-footer-mark" aria-hidden="true">♡</span>
-            <strong>Maternal Health Visit Reminder</strong>
-          </Link>
-          <span className="login-footer-message">Together for a healthier tomorrow <span aria-hidden="true">♥</span></span>
-          <a className="login-footer-contact" href={`tel:${SUPPORT_PHONE}`}>Contact us: {SUPPORT_PHONE}</a>
-        </footer>
-      </div>
-    );
-  }
-
   return (
-    <main className="auth-layout">
-      <section className="auth-intro">
-        <span className="eyebrow">PERSONALIZED MATERNAL CARE</span>
-        <h1>Every visit is a step toward a healthier beginning.</h1>
-        <p>Keep care plans clear, visits on track, and your support team close.</p>
-        <div className="intro-note"><span className="note-icon">✳</span><span>One thoughtful reminder at a time.</span></div>
-      </section>
-      {formCard}
-    </main>
+    <div className="login-page">
+      <header className="login-header">
+        <Link className="login-brand" to="/" aria-label="Maternal Health Visit Reminder home">
+          <span className="login-brand-mark" aria-hidden="true">♡</span>
+          <span>Maternal Health<small>Visit Reminder</small></span>
+        </Link>
+        <nav className="login-nav" aria-label="Main navigation">
+          <Link className="login-nav-active" to="/">Home</Link>
+          <Link to="/#about">About</Link>
+          <Link to="/#features">Features</Link>
+          <Link to="/#how-it-works">How It Works</Link>
+          <Link to="/#contact">Contact</Link>
+        </nav>
+        <div className="login-header-actions">
+          <Link className={register ? "" : "login-header-signin"} to="/login" aria-current={register ? undefined : "page"}>Sign In</Link>
+          <Link className={register ? "login-header-signup" : ""} to="/register" aria-current={register ? "page" : undefined}>Sign Up</Link>
+        </div>
+      </header>
+      <main className={`login-hero${register ? " signup-hero" : ""}`}>
+        <div className="login-photo" role="img" aria-label="A pregnant mother meeting with a nurse for prenatal care" />
+        <section className="login-intro">
+          <span className="login-kicker"><span aria-hidden="true">♥</span> {register ? "Your care journey starts here" : "Personalized Maternal Care"}</span>
+          <h1>{register ? <>Start your journey toward a <span>healthier beginning.</span></> : <>Every visit is a step toward a <span>healthier beginning.</span></>}</h1>
+          <p>{register ? "Create an account to organize prenatal visits and stay connected with your care team." : "Keep care plans clear, visits on track, and your support team close."}</p>
+          <ul className="login-benefits" aria-label="Care features">
+            <li><span aria-hidden="true">▦</span>Track<br />Appointments</li>
+            <li><span aria-hidden="true">♧</span>Get<br />Reminders</li>
+            <li><span aria-hidden="true">✓</span>Monitor<br />Health Progress</li>
+            <li><span aria-hidden="true">♥</span>Better Care<br />for You &amp; Baby</li>
+          </ul>
+          <p className="login-tagline">Healthy Mother. Healthy Baby. A Healthier Rwanda.</p>
+        </section>
+        {formCard}
+      </main>
+      <footer className="login-footer">
+        <Link className="login-footer-brand" to="/">
+          <span className="login-footer-mark" aria-hidden="true">♡</span>
+          <strong>Maternal Health Visit Reminder</strong>
+        </Link>
+        <span className="login-footer-message">Together for a healthier tomorrow <span aria-hidden="true">♥</span></span>
+        <a className="login-footer-contact" href={`tel:${SUPPORT_PHONE}`}>Contact us: {SUPPORT_PHONE}</a>
+      </footer>
+    </div>
   );
 }
 

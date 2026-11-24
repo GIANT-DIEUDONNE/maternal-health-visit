@@ -415,6 +415,15 @@ h1, h2, h3 { font-family: Manrope, sans-serif; letter-spacing: -1px; }
 .login-card .forgot-password-link a { color: #7115b0; }
 .login-card .auth-switch { margin-top: 16px; font-size: 12px; }
 .login-card .auth-switch a { color: #7115b0; }
+.signup-hero { grid-template-columns: minmax(0, 1.05fr) minmax(420px, .85fr); }
+.signup-card { width: min(100%, 500px); padding: 27px 30px 23px; }
+.signup-kicker { margin-bottom: 8px; color: #7717b2; font-size: 9px; font-weight: 800; letter-spacing: 1.35px; }
+.signup-card h2 { font-size: 25px; }
+.signup-card .form-subtitle { margin-bottom: 16px; }
+.signup-card .form-stack { gap: 10px; }
+.signup-card .field input, .signup-card .field select { height: 40px; padding: 0 12px; border-color: #ded8eb; border-radius: 8px; background: #f8f6fc; }
+.signup-card .field input:focus, .signup-card .field select:focus { border-color: #8a35cc; box-shadow: 0 0 0 3px #8a35cc20; }
+.signup-card .full-width { margin-top: 1px; }
 .login-footer { min-height: 58px; display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 9px max(calc((100vw - 1360px) / 2), 4vw); color: #5b128d; background: #f0e0ff; }
 .login-footer-brand { gap: 9px; color: #58108e; font-size: 12px; }
 .login-footer-mark { width: 34px; height: 34px; display: grid; place-items: center; border: 2px solid #7a18b6; border-radius: 50%; color: #9c25b5; font: 22px Georgia, serif; }
@@ -433,6 +442,12 @@ h1, h2, h3 { font-family: Manrope, sans-serif; letter-spacing: -1px; }
   .login-hero { grid-template-columns: minmax(0, 1fr) minmax(340px, .82fr); gap: 20px; padding-right: 5vw; padding-left: 5vw; }
   .login-photo { left: 22%; width: 42%; }
   .login-card { padding: 28px 26px 23px; }
+}
+@media (max-width: 850px) {
+  .signup-hero { display: flex; flex-direction: column; align-items: stretch; gap: 22px; padding-top: 30px; padding-bottom: 30px; }
+  .signup-hero .login-intro { max-width: 620px; }
+  .signup-hero .login-photo { left: 34%; width: 66%; opacity: .38; }
+  .signup-card { width: min(100%, 560px); align-self: center; }
 }
 @media (max-width: 700px) {
   .login-header { min-height: auto; flex-wrap: wrap; padding: 10px 15px; }
@@ -453,6 +468,8 @@ h1, h2, h3 { font-family: Manrope, sans-serif; letter-spacing: -1px; }
   .login-benefits li span { width: 35px; height: 35px; font-size: 18px; }
   .login-intro .login-tagline { font-size: 13px; }
   .login-card { width: 100%; padding: 26px 21px 23px; border-radius: 18px; }
+  .signup-card { width: 100%; padding: 25px 20px 21px; }
+  .signup-card .form-stack { gap: 9px; }
   .login-footer { flex-wrap: wrap; justify-content: center; padding: 12px 16px; text-align: center; }
   .login-footer-brand { width: 100%; justify-content: center; }
   .login-footer-message { font-size: 11px; }
