@@ -189,6 +189,76 @@ function AuthPage({ register = false, onAuthenticated }) {
       setBusy(false);
     }
   };
+  const formCard = (
+    <section className={register ? "auth-card" : "login-card"}>
+      {!register && <span className="login-lock" aria-hidden="true">🔒</span>}
+      {register && <div className="card-kicker">CREATE YOUR ACCOUNT</div>}
+      <h2>{register ? "Join Bloom" : "Welcome Back"}</h2>
+      <p className="form-subtitle">{register ? values.role === "nurse" ? "Nurse registration requires a clinic invite code and a phone number for account recovery." : "Create your mother account to view your care plan." : "Sign in to continue to your care dashboard."}</p>
+      <form onSubmit={submit} className="form-stack">
+        {register && <Field label="Full name" value={values.name} onChange={(name) => setValues({ ...values, name })} required />}
+        {register && <label className="field"><span>Account role</span><select value={values.role} onChange={(event) => setValues({ ...values, role: event.target.value })}><option value="mother">Mother</option><option value="nurse">Nurse</option></select></label>}
+        <Field label="Email address" type="email" autoComplete="email" value={values.email} onChange={(email) => setValues({ ...values, email })} required />
+        <Field label="Password" type="password" autoComplete={register ? "new-password" : "current-password"} value={values.password} onChange={(password) => setValues({ ...values, password })} minLength="8" required />
+        {register && <Field label="Phone number (include country code)" type="tel" placeholder="+1234567890" value={values.phone} onChange={(phone) => setValues({ ...values, phone })} required />}
+        {register && values.role === "mother" && <Field label="Expected due date" type="date" value={values.dueDate} onChange={(dueDate) => setValues({ ...values, dueDate })} required />}
+        {register && values.role === "nurse" && <Field label="Nurse invite code" type="password" value={values.nurseRegistrationCode} onChange={(nurseRegistrationCode) => setValues({ ...values, nurseRegistrationCode })} required />}
+        {error && <ErrorBanner>{error}</ErrorBanner>}
+        <button className="button button-primary full-width" disabled={busy}>{busy ? "Please wait..." : register ? "Create account" : "Sign in"} <span>→</span></button>
+      </form>
+      {!register && <p className="forgot-password-link"><Link to="/forgot-password">Forgot your password?</Link></p>}
+      <p className="auth-switch">{register ? "Already have an account?" : "New to Bloom?"} <Link to={register ? "/login" : "/register"}>{register ? "Sign in" : "Create an account"}</Link></p>
+    </section>
+  );
+
+  if (!register) {
+    return (
+      <div className="login-page">
+        <header className="login-header">
+          <Link className="login-brand" to="/" aria-label="Maternal Health Visit Reminder home">
+            <span className="login-brand-mark" aria-hidden="true">♡</span>
+            <span>Maternal Health<small>Visit Reminder</small></span>
+          </Link>
+          <nav className="login-nav" aria-label="Main navigation">
+            <Link className="login-nav-active" to="/">Home</Link>
+            <Link to="/#about">About</Link>
+            <Link to="/#features">Features</Link>
+            <Link to="/#how-it-works">How It Works</Link>
+            <Link to="/#contact">Contact</Link>
+          </nav>
+          <div className="login-header-actions">
+            <Link className="login-header-signin" to="/login" aria-current="page">Sign In</Link>
+            <Link className="login-header-signup" to="/register">Sign Up</Link>
+          </div>
+        </header>
+        <main className="login-hero">
+          <div className="login-photo" role="img" aria-label="A pregnant mother meeting with a nurse for prenatal care" />
+          <section className="login-intro">
+            <span className="login-kicker"><span aria-hidden="true">♥</span> Personalized Maternal Care</span>
+            <h1>Every visit is a step toward a <span>healthier beginning.</span></h1>
+            <p>Keep care plans clear, visits on track, and your support team close.</p>
+            <ul className="login-benefits" aria-label="Care features">
+              <li><span aria-hidden="true">▦</span>Track<br />Appointments</li>
+              <li><span aria-hidden="true">♧</span>Get<br />Reminders</li>
+              <li><span aria-hidden="true">✓</span>Monitor<br />Health Progress</li>
+              <li><span aria-hidden="true">♥</span>Better Care<br />for You &amp; Baby</li>
+            </ul>
+            <p className="login-tagline">Healthy Mother. Healthy Baby. A Healthier Rwanda.</p>
+          </section>
+          {formCard}
+        </main>
+        <footer className="login-footer">
+          <Link className="login-footer-brand" to="/">
+            <span className="login-footer-mark" aria-hidden="true">♡</span>
+            <strong>Maternal Health Visit Reminder</strong>
+          </Link>
+          <span className="login-footer-message">Together for a healthier tomorrow <span aria-hidden="true">♥</span></span>
+          <a className="login-footer-contact" href={`tel:${SUPPORT_PHONE}`}>Contact us: {SUPPORT_PHONE}</a>
+        </footer>
+      </div>
+    );
+  }
+
   return (
     <main className="auth-layout">
       <section className="auth-intro">
@@ -197,26 +267,7 @@ function AuthPage({ register = false, onAuthenticated }) {
         <p>Keep care plans clear, visits on track, and your support team close.</p>
         <div className="intro-note"><span className="note-icon">✳</span><span>One thoughtful reminder at a time.</span></div>
       </section>
-      <section className="auth-card">
-        <div className="card-kicker">{register ? "CREATE YOUR ACCOUNT" : "WELCOME BACK"}</div>
-        <h2>{register ? "Join Bloom" : "Sign in"}</h2>
-        <p className="form-subtitle">{register ? values.role === "nurse" ? "Nurse registration requires a clinic invite code and a phone number for account recovery." : "Create your mother account to view your care plan." : "Sign in to continue to your care dashboard."}</p>
-        <form onSubmit={submit} className="form-stack">
-          {register && <Field label="Full name" value={values.name} onChange={(name) => setValues({ ...values, name })} required />}
-          {register && <label className="field"><span>Account role</span><select value={values.role} onChange={(event) => setValues({ ...values, role: event.target.value })}><option value="mother">Mother</option><option value="nurse">Nurse</option></select></label>}
-          <Field label="Email address" type="email" value={values.email} onChange={(email) => setValues({ ...values, email })} required />
-          <Field label="Password" type="password" value={values.password} onChange={(password) => setValues({ ...values, password })} minLength="8" required />
-          {register && <Field label="Phone number (include country code)" type="tel" placeholder="+1234567890" value={values.phone} onChange={(phone) => setValues({ ...values, phone })} required />}
-          {register && values.role === "mother" && <>
-            <Field label="Expected due date" type="date" value={values.dueDate} onChange={(dueDate) => setValues({ ...values, dueDate })} required />
-          </>}
-          {register && values.role === "nurse" && <Field label="Nurse invite code" type="password" value={values.nurseRegistrationCode} onChange={(nurseRegistrationCode) => setValues({ ...values, nurseRegistrationCode })} required />}
-          {error && <ErrorBanner>{error}</ErrorBanner>}
-          <button className="button button-primary full-width" disabled={busy}>{busy ? "Please wait..." : register ? "Create account" : "Sign in"} <span>→</span></button>
-        </form>
-        {!register && <p className="forgot-password-link"><Link to="/forgot-password">Forgot your password?</Link></p>}
-        <p className="auth-switch">{register ? "Already have an account?" : "New to Bloom?"} <Link to={register ? "/login" : "/register"}>{register ? "Sign in" : "Create an account"}</Link></p>
-      </section>
+      {formCard}
     </main>
   );
 }
