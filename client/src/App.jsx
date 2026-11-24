@@ -139,12 +139,12 @@ function LandingPage() {
           <span className="landing-brand-mark" aria-hidden="true">♡</span>
           <span>Maternal Health<span>Visit Reminder</span></span>
         </a>
-        <div className="landing-footer-copy" id="contact">
+        <div className="landing-footer-copy">
           <p>Thoughtful support for a healthier pregnancy journey.</p>
-          <p><strong>Contact us:</strong> <a href={`tel:${SUPPORT_PHONE}`}>{SUPPORT_PHONE}</a></p>
         </div>
         <a href="#home" className="landing-back-top">Back to top ↑</a>
       </footer>
+      <ContactStrip />
     </div>
   );
 }
@@ -303,8 +303,9 @@ function AuthPage({ register = false, onAuthenticated }) {
           <strong>Maternal Health Visit Reminder</strong>
         </Link>
         <span className="login-footer-message">Together for a healthier tomorrow <span aria-hidden="true">♥</span></span>
-        <a className="login-footer-contact" href={`tel:${SUPPORT_PHONE}`}>Contact us: {SUPPORT_PHONE}</a>
+        {!register && <a className="login-footer-contact" href={`tel:${SUPPORT_PHONE}`}>Contact us: {SUPPORT_PHONE}</a>}
       </footer>
+      {register && <ContactStrip />}
     </div>
   );
 }
@@ -437,14 +438,14 @@ function Dashboard({ session, visitReminder }) {
         )}
         {!result.loading && result.pagination?.pages > 1 && <div className="pagination"><button className="button button-outline" disabled={page === 1} onClick={() => setPage(page - 1)}>← Previous</button><span>Page {page} of {result.pagination.pages}</span><button className="button button-outline" disabled={page === result.pagination.pages} onClick={() => setPage(page + 1)}>Next →</button></div>}
       </main>
-      <DashboardContact />
+      <ContactStrip />
     </div>
   );
 }
 
-function DashboardContact() {
+function ContactStrip() {
   return (
-    <footer className="dashboard-contact">
+    <footer className="dashboard-contact" id="contact">
       <div className="dashboard-contact-inner">
         <div className="dashboard-contact-details">
           <strong>Contact Us:</strong>
