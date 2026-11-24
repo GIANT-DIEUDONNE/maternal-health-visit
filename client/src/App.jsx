@@ -648,7 +648,8 @@ function MessagesPage({ session, visitReminder, onLogout }) {
                   <div className="message-actions">
                     <a className="button button-primary" href={`tel:${SUPPORT_PHONE}`}>Call support</a>
                     <a className="button button-outline" href={`sms:${phoneForSms(SUPPORT_PHONE)}`}>Send SMS</a>
-                    <a className="button button-outline" href={`mailto:${SUPPORT_EMAIL}`}>Email support</a>
+                    <a className="button button-outline" href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(SUPPORT_EMAIL)}&su=${encodeURIComponent("Maternal Health support request")}&body=${encodeURIComponent("Hello, I need help with my maternal health account or care plan.")}`} target="_blank" rel="noopener noreferrer">Email support</a>
+                    <a className="button button-outline" href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent("Maternal Health support request")}&body=${encodeURIComponent("Hello, I need help with my maternal health account or care plan.")}`}>Use your email app</a>
                     <a className="button button-outline" href={whatsAppUrl(SUPPORT_PHONE)} target="_blank" rel="noopener noreferrer">WhatsApp</a>
                   </div>
                 </div>

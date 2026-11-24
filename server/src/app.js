@@ -5,6 +5,7 @@ import mongoose from "mongoose";
 import { z } from "zod";
 import { User, Mother, Visit } from "./models.js";
 import { createAuthRouter, requireAuth, requireRole } from "./auth.js";
+import { createWhatsAppWebhook } from "./whatsapp.js";
 import { calculateVisitDates, canLogVisit, isMissed, startOfUtcDay } from "./schedule.js";
 
 const motherInput = z.object({
@@ -34,10 +35,14 @@ function isValidId(id) {
 export function createApp() {
   const app = express();
   app.use(cors({ origin: process.env.CLIENT_ORIGIN || "http://localhost:5173" }));
-  app.use(express.json({ limit: "20kb" }));
+  app.use(express.json({
+    limit: "20kb",
+    verify: (req, _res, buffer) => { req.rawBody = Buffer.from(buffer); }
+  }));
 
   app.get("/api/health", (_req, res) => res.json({ status: "ok" }));
   app.use("/api/auth", createAuthRouter(express, bcrypt));
+  app.use("/api/webhooks/whatsapp", createWhatsAppWebhook(express));
 
   app.get("/api/mothers", requireAuth, async (req, res, next) => {
     const page = paginated(req.query);

@@ -6,9 +6,11 @@ Mother accounts see an in-app dashboard reminder the day before a scheduled visi
 
 Password recovery uses an SMS verification code sent through Twilio Verify. Set `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_VERIFY_SERVICE_SID` to enable it. Account phone numbers must use international format (E.164); existing accounts without a matching number can contact support at `0790684556`.
 
+The Messages page email button opens a pre-addressed Gmail compose window; **Use your email app** opens the same draft in the device's configured mail app. WhatsApp's automatic support reply requires a Meta WhatsApp Business/Cloud API number. Set `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, and `WHATSAPP_GRAPH_API_VERSION` in the API deployment environment. `WHATSAPP_AUTO_REPLY` can override the default response. Configure the Meta webhook callback URL as `https://<your-api-host>/api/webhooks/whatsapp`, use the same verify token, and subscribe to the `messages` webhook field. The webhook verifies Meta's `X-Hub-Signature-256` before sending replies. Replies will remain disabled until these credentials and the Meta webhook subscription are configured. Never commit or share the access token or app secret.
+
 ## Run locally
 
-1. Install Node.js and MongoDB Community Server, then start MongoDB.
+1. Install Node.js and MongoDB Community Server, then start MongoDB. To receive live Meta webhook events in local development, expose the API through a publicly reachable HTTPS URL and configure that URL in Meta.
 2. Copy `server/.env.example` to `server/.env`. Set a private `JWT_SECRET`, nurse email/password, and a private `NURSE_REGISTRATION_CODE`. Set `NURSE_PHONE` in international format for the seeded nurse account's password recovery. Add the Twilio Verify credentials to enable SMS recovery. Share the invite code only with authorized nurses. `CLIENT_ORIGIN=*` allows browser requests from any origin; restrict it to your frontend origin in production.
 3. From the project root, run `npm install`.
 4. Seed 10 sample mother records (and five scheduled visits per mother): `npm run seed`.
