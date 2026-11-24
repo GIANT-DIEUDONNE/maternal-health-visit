@@ -45,12 +45,13 @@ test("mother registration saves the mother role and creates her care plan", asyn
     name: "Registered Mother",
     email: "registered-mother@test.local",
     password: "password123",
-    phone: "5551234567",
+    phone: "+15551234567",
     dueDate: dueDate.toISOString()
   });
   assert.equal(response.status, 201);
   assert.equal(response.body.user.role, "mother");
   const user = await User.findById(response.body.user.id);
+  assert.equal(user.phone, "+15551234567");
   const carePlan = await Mother.findOne({ userId: user.id });
   assert.ok(carePlan);
   assert.equal(await Visit.countDocuments({ motherId: carePlan.id }), 5);
@@ -62,6 +63,7 @@ test("nurse registration requires the configured invite code and saves the nurse
     name: "Uninvited Nurse",
     email: "uninvited@test.local",
     password: "password123",
+    phone: "+15551234567",
     nurseRegistrationCode: "wrong-code"
   });
   assert.equal(denied.status, 403);
@@ -72,11 +74,12 @@ test("nurse registration requires the configured invite code and saves the nurse
     name: "Registered Nurse",
     email: "registered-nurse@test.local",
     password: "password123",
+    phone: "+15551234567",
     nurseRegistrationCode: process.env.NURSE_REGISTRATION_CODE
   });
   assert.equal(response.status, 201);
   assert.equal(response.body.user.role, "nurse");
-  assert.ok(await User.exists({ email: "registered-nurse@test.local", role: "nurse" }));
+  assert.ok(await User.exists({ email: "registered-nurse@test.local", role: "nurse", phone: "+15551234567" }));
   assert.equal(await Mother.countDocuments(), 1);
 });
 

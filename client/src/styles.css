@@ -103,6 +103,9 @@ h1, h2, h3 { font-family: Manrope, sans-serif; letter-spacing: -1px; }
 .auth-switch a { color: var(--green); font-weight: 700; }
 .forgot-password-link { margin: -4px 0 0; text-align: right; font-size: 11px; }
 .forgot-password-link a { color: var(--green); font-weight: 700; }
+.plain-link { padding: 0; border: 0; color: var(--green); background: transparent; cursor: pointer; font-size: 11px; font-weight: 700; }
+.recovery-contact { margin: 15px 0 0; text-align: center; color: #858d88; font-size: 10px; }
+.recovery-contact a { color: var(--green); font-weight: 700; white-space: nowrap; }
 .error-banner { padding: 11px 12px; border: 1px solid #f1d4d0; border-radius: 7px; background: #fff7f5; color: #9e4e45; font-size: 12px; }
 .form-page { max-width: 680px; margin: 0 auto; padding: 48px 24px 80px; }
 .back-link { display: inline-block; margin-bottom: 22px; color: #67786e; font-size: 12px; font-weight: 600; }

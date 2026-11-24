@@ -176,7 +176,7 @@ function AuthPage({ register = false, onAuthenticated }) {
     setBusy(true);
     try {
       const registration = values.role === "nurse"
-        ? { role: values.role, name: values.name, email: values.email, password: values.password, nurseRegistrationCode: values.nurseRegistrationCode }
+        ? { role: values.role, name: values.name, email: values.email, password: values.password, phone: values.phone, nurseRegistrationCode: values.nurseRegistrationCode }
         : { role: values.role, name: values.name, email: values.email, password: values.password, phone: values.phone, dueDate: values.dueDate };
       const { token, user } = await api(`/auth/${register ? "register" : "login"}`, {
         method: "POST",
@@ -200,14 +200,14 @@ function AuthPage({ register = false, onAuthenticated }) {
       <section className="auth-card">
         <div className="card-kicker">{register ? "CREATE YOUR ACCOUNT" : "WELCOME BACK"}</div>
         <h2>{register ? "Join Bloom" : "Sign in"}</h2>
-        <p className="form-subtitle">{register ? values.role === "nurse" ? "Nurse registration requires a clinic invite code." : "Create your mother account to view your care plan." : "Sign in to continue to your care dashboard."}</p>
+        <p className="form-subtitle">{register ? values.role === "nurse" ? "Nurse registration requires a clinic invite code and a phone number for account recovery." : "Create your mother account to view your care plan." : "Sign in to continue to your care dashboard."}</p>
         <form onSubmit={submit} className="form-stack">
           {register && <Field label="Full name" value={values.name} onChange={(name) => setValues({ ...values, name })} required />}
           {register && <label className="field"><span>Account role</span><select value={values.role} onChange={(event) => setValues({ ...values, role: event.target.value })}><option value="mother">Mother</option><option value="nurse">Nurse</option></select></label>}
           <Field label="Email address" type="email" value={values.email} onChange={(email) => setValues({ ...values, email })} required />
           <Field label="Password" type="password" value={values.password} onChange={(password) => setValues({ ...values, password })} minLength="8" required />
+          {register && <Field label="Phone number (include country code)" type="tel" placeholder="+1234567890" value={values.phone} onChange={(phone) => setValues({ ...values, phone })} required />}
           {register && values.role === "mother" && <>
-            <Field label="Phone number" type="tel" value={values.phone} onChange={(phone) => setValues({ ...values, phone })} required />
             <Field label="Expected due date" type="date" value={values.dueDate} onChange={(dueDate) => setValues({ ...values, dueDate })} required />
           </>}
           {register && values.role === "nurse" && <Field label="Nurse invite code" type="password" value={values.nurseRegistrationCode} onChange={(nurseRegistrationCode) => setValues({ ...values, nurseRegistrationCode })} required />}
@@ -222,20 +222,81 @@ function AuthPage({ register = false, onAuthenticated }) {
 }
 
 function ForgotPasswordPage() {
+  const [step, setStep] = useState("request");
+  const [values, setValues] = useState({ email: "", phone: "", code: "", newPassword: "", confirmPassword: "" });
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const complete = step === "complete";
+  const submit = async (event) => {
+    event.preventDefault();
+    setError("");
+    if (step === "reset" && values.newPassword !== values.confirmPassword) {
+      setError("The passwords do not match.");
+      return;
+    }
+    setBusy(true);
+    try {
+      if (step === "request") {
+        const response = await api("/auth/forgot-password", {
+          method: "POST",
+          body: JSON.stringify({ email: values.email, phone: values.phone })
+        });
+        setMessage(response.message);
+        setStep("reset");
+      } else {
+        await api("/auth/reset-password", {
+          method: "POST",
+          body: JSON.stringify({ email: values.email, phone: values.phone, code: values.code, newPassword: values.newPassword })
+        });
+        setStep("complete");
+      }
+    } catch (reason) {
+      setError(reason.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <main className="auth-layout">
       <section className="auth-intro">
         <span className="eyebrow">ACCOUNT SUPPORT</span>
-        <h1>We’re here to help you get back in.</h1>
-        <p>Contact our support team for help recovering access to your account.</p>
-        <div className="intro-note"><span className="note-icon">✳</span><span>We’ll help you recover access safely.</span></div>
+        <h1>Reset your password securely.</h1>
+        <p>We’ll send a verification code to the phone number registered to your account.</p>
+        <div className="intro-note"><span className="note-icon">✳</span><span>Your phone number helps protect your account.</span></div>
       </section>
       <section className="auth-card">
-        <div className="card-kicker">PASSWORD HELP</div>
-        <h2>Forgot your password?</h2>
-        <p className="form-subtitle">Automated password resets are not available yet. Call us and our support team can help you recover your account.</p>
-        <a className="button button-primary full-width contact-phone-button" href={`tel:${SUPPORT_PHONE}`}>Call {SUPPORT_PHONE}</a>
-        <p className="auth-switch"><Link to="/login">Back to sign in</Link></p>
+        <div className="card-kicker">{complete ? "PASSWORD UPDATED" : "ACCOUNT RECOVERY"}</div>
+        <h2>{complete ? "Your password is reset" : step === "request" ? "Forgot your password?" : "Enter your new password"}</h2>
+        <p className="form-subtitle">
+          {complete
+            ? "You can now sign in with your new password."
+            : step === "request"
+              ? "Enter your account email and registered phone number in international format, starting with +."
+              : message}
+        </p>
+        {complete ? (
+          <Link className="button button-primary full-width" to="/login">Back to sign in</Link>
+        ) : (
+          <form onSubmit={submit} className="form-stack">
+            {step === "request" ? <>
+              <Field label="Email address" type="email" value={values.email} onChange={(email) => setValues({ ...values, email })} required />
+              <Field label="Phone number (include country code)" type="tel" placeholder="+1234567890" autoComplete="tel" value={values.phone} onChange={(phone) => setValues({ ...values, phone })} required />
+            </> : <>
+              <Field label="SMS verification code" inputMode="numeric" autoComplete="one-time-code" value={values.code} onChange={(code) => setValues({ ...values, code })} required />
+              <Field label="New password" type="password" minLength="8" value={values.newPassword} onChange={(newPassword) => setValues({ ...values, newPassword })} required />
+              <Field label="Confirm new password" type="password" minLength="8" value={values.confirmPassword} onChange={(confirmPassword) => setValues({ ...values, confirmPassword })} required />
+            </>}
+            {error && <ErrorBanner>{error}</ErrorBanner>}
+            <button className="button button-primary full-width" disabled={busy}>{busy ? "Please wait..." : step === "request" ? "Send verification code" : "Update password"} <span>→</span></button>
+          </form>
+        )}
+        {!complete && <p className="recovery-contact">Can’t access your registered phone? <a href={`tel:${SUPPORT_PHONE}`}>Call {SUPPORT_PHONE}</a></p>}
+        {!complete && <p className="auth-switch">
+          {step === "reset" && <button type="button" className="plain-link" onClick={() => { setError(""); setMessage(""); setStep("request"); }}>Use different details</button>}
+          <Link to="/login">Back to sign in</Link>
+        </p>}
       </section>
     </main>
   );

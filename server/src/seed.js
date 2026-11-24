@@ -22,16 +22,21 @@ const mothers = await Mother.insertMany(names.map((name, index) => ({
 await Visit.insertMany(mothers.flatMap((mother) => calculateVisitDates(mother.dueDate).map((visit) => ({ ...visit, motherId: mother._id }))));
 
 if (process.env.NURSE_EMAIL && process.env.NURSE_PASSWORD) {
+  const nurseFields = {
+    name: process.env.NURSE_NAME || "Clinic Nurse",
+    email: process.env.NURSE_EMAIL.toLowerCase(),
+    passwordHash: await bcrypt.hash(process.env.NURSE_PASSWORD, 12),
+    role: "nurse"
+  };
+  if (process.env.NURSE_PHONE) {
+    if (!/^\+[1-9]\d{7,14}$/.test(process.env.NURSE_PHONE)) {
+      throw new Error("NURSE_PHONE must use international format, starting with + and the country code.");
+    }
+    nurseFields.phone = process.env.NURSE_PHONE;
+  }
   await User.updateOne(
     { email: process.env.NURSE_EMAIL.toLowerCase() },
-    {
-      $set: {
-        name: process.env.NURSE_NAME || "Clinic Nurse",
-        email: process.env.NURSE_EMAIL.toLowerCase(),
-        passwordHash: await bcrypt.hash(process.env.NURSE_PASSWORD, 12),
-        role: "nurse"
-      }
-    },
+    { $set: nurseFields },
     { upsert: true }
   );
 }
