@@ -363,8 +363,8 @@ function Dashboard({ session }) {
   const missedCount = missed.reduce((sum, item) => sum + item.missedVisits.length, 0);
 
   return (
-    <main className="page-wrap">
-      <div className="page-heading">
+    <main className="page-wrap dashboard-page">
+      <div className="page-heading dashboard-heading">
         <div><span className="eyebrow">YOUR CARE OVERVIEW</span><h1>{session.user.role === "nurse" ? "Good morning, care team." : `Welcome, ${session.user.name.split(" ")[0]}.`}</h1><p>{session.user.role === "nurse" ? "Here’s the latest across your maternal care list." : "Here’s your personalized visit plan."}</p></div>
         {session.user.role === "nurse" && <Link className="button button-primary" to="/mothers/new"><span className="plus">+</span> Add a mother</Link>}
       </div>
@@ -377,7 +377,7 @@ function Dashboard({ session }) {
         </div>
       )}
       {session.user.role === "nurse" && missed.length > 0 && <div className="notice"><span>!</span><p><strong>{missed.length} {missed.length === 1 ? "mother has" : "mothers have"} visits to follow up.</strong> Review their care plans below.</p></div>}
-      <div className="section-heading"><div><h2>{session.user.role === "nurse" ? "Mother care plans" : "Your care plan"}</h2><p>{session.user.role === "nurse" ? "A clear view of each journey and next step." : "Your visits, thoughtfully planned around your due date."}</p></div><span className="results-count">{result.pagination?.total ?? 0} {result.pagination?.total === 1 ? "profile" : "profiles"}</span></div>
+      <div className="section-heading dashboard-section-heading"><div><h2>{session.user.role === "nurse" ? "Mother care plans" : "Your care plan"}</h2><p>{session.user.role === "nurse" ? "A clear view of each journey and next step." : "Your visits, thoughtfully planned around your due date."}</p></div><span className="results-count">{result.pagination?.total ?? 0} {result.pagination?.total === 1 ? "profile" : "profiles"}</span></div>
       {result.loading ? <LoadingState text="Loading care plans..." /> : result.error ? <ErrorState message={result.error} retry={load} /> : result.data.length === 0 ? <EmptyState title="No care plans yet" body={session.user.role === "nurse" ? "Add a mother to start tracking her visits." : "Your care plan will appear here."} /> : (
         <div className="mother-grid">
           {result.data.map((mother) => <MotherCard key={mother._id} mother={mother} token={session.token} />)}
