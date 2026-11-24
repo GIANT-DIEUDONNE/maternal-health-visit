@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useState } from "react";
-import { Link, Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
+import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
 import { api } from "./api.js";
 
 const SUPPORT_PHONE = "+250790684556";
@@ -15,7 +15,9 @@ function readSession() {
 
 function App() {
   const [session, setSession] = useState(readSession);
+  const location = useLocation();
   const navigate = useNavigate();
+  const onDashboard = location.pathname === "/dashboard";
   const visitReminder = useVisitReminder(session?.token, session?.user?.role === "mother");
   const onAuthenticated = (value) => {
     localStorage.setItem("maternal-session", JSON.stringify(value));
@@ -30,13 +32,13 @@ function App() {
 
   return (
     <div className="app-shell">
-      {session && <Header session={session} onLogout={logout} visitReminder={visitReminder} />}
+      {session && !onDashboard && <Header session={session} onLogout={logout} visitReminder={visitReminder} />}
       <Routes>
         <Route path="/" element={session ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
         <Route path="/login" element={session ? <Navigate to="/dashboard" replace /> : <AuthPage onAuthenticated={onAuthenticated} />} />
         <Route path="/forgot-password" element={session ? <Navigate to="/dashboard" replace /> : <ForgotPasswordPage />} />
         <Route path="/register" element={session ? <Navigate to="/dashboard" replace /> : <AuthPage register onAuthenticated={onAuthenticated} />} />
-        <Route path="/dashboard" element={<Protected session={session}><Dashboard session={session} visitReminder={visitReminder} /></Protected>} />
+        <Route path="/dashboard" element={<Protected session={session}><Dashboard session={session} visitReminder={visitReminder} onLogout={logout} /></Protected>} />
         <Route path="/mothers/new" element={<Protected session={session} role="nurse"><MotherForm session={session} /></Protected>} />
         <Route path="/mothers/:id" element={<Protected session={session}><MotherDetail session={session} /></Protected>} />
         <Route path="*" element={<Navigate to={session ? "/dashboard" : "/"} replace />} />
@@ -156,34 +158,34 @@ function Protected({ session, role, children }) {
 }
 
 function useVisitReminder(token, enabled) {
-  const [state, setState] = useState({ loading: false, error: "", visit: null });
+  const [state, setState] = useState({ loading: false, error: "", visit: null, visits: [] });
   useEffect(() => {
     let active = true;
     if (!enabled || !token) {
-      setState({ loading: false, error: "", visit: null });
+      setState({ loading: false, error: "", visit: null, visits: [] });
       return () => { active = false; };
     }
 
-    setState({ loading: true, error: "", visit: null });
+    setState({ loading: true, error: "", visit: null, visits: [] });
     api("/visits?page=1&limit=100", { token })
       .then(({ data }) => {
         const tomorrow = startOfUtcDay(new Date()).getTime() + 86400000;
         const visit = data.find((item) => !item.completedAt && startOfUtcDay(item.visitDate).getTime() === tomorrow);
-        if (active) setState({ loading: false, error: "", visit: visit || null });
+        if (active) setState({ loading: false, error: "", visit: visit || null, visits: data });
       })
       .catch((error) => {
-        if (active) setState({ loading: false, error: error.message, visit: null });
+        if (active) setState({ loading: false, error: error.message, visit: null, visits: [] });
       });
     return () => { active = false; };
   }, [enabled, token]);
   return state;
 }
 
-function Header({ session, onLogout, visitReminder }) {
+function Header({ session, onLogout, visitReminder, dashboard = false }) {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   return (
-    <header className="topbar">
-      <Link to="/" className="brand"><span className="brand-mark">b</span><span>Bloom<span className="brand-muted"> / maternal care</span></span></Link>
+    <header className={`topbar${dashboard ? " dashboard-topbar" : ""}`}>
+      <Link to="/" className="brand"><span className="brand-mark">{dashboard ? <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 20a8 8 0 0 1 16 0z" /></svg> : "b"}</span><span>Bloom<span className="brand-muted"> / maternal care</span></span></Link>
       <div className="topbar-right">
         {session.user.role === "mother" && <div className="notification-menu">
           <button
@@ -391,7 +393,7 @@ function ForgotPasswordPage() {
   );
 }
 
-function Dashboard({ session, visitReminder }) {
+function Dashboard({ session, visitReminder, onLogout }) {
   const [result, setResult] = useState({ loading: true, error: "", data: [], pagination: null });
   const [page, setPage] = useState(1);
   const [missed, setMissed] = useState([]);
@@ -423,33 +425,77 @@ function Dashboard({ session, visitReminder }) {
   }, [page, session.token, session.user.role]);
   useEffect(() => { load(); }, [load]);
   const missedCount = missed.reduce((sum, item) => sum + item.missedVisits.length, 0);
+  const motherVisits = visitReminder.visits || [];
+  const completedVisits = motherVisits.filter((visit) => visit.completedAt).length;
+  const today = startOfUtcDay(new Date()).getTime();
+  const nextVisit = motherVisits.find((visit) => !visit.completedAt && startOfUtcDay(visit.visitDate).getTime() >= today);
 
   return (
-    <div className="dashboard-shell">
-      <main className="page-wrap dashboard-page">
-        <div className="page-heading dashboard-heading">
-          <div><span className="eyebrow">YOUR CARE OVERVIEW</span><h1>{session.user.role === "nurse" ? `${greeting}, ${session.user.name.split(" ")[0]}.` : `Welcome, ${session.user.name.split(" ")[0]}.`}</h1><p>{session.user.role === "nurse" ? "Here’s the latest across your maternal care list." : "Here’s your personalized visit plan."}</p></div>
-          {session.user.role === "nurse" && <Link className="button button-primary" to="/mothers/new"><span className="plus">+</span> Add a mother</Link>}
+    <div className={`dashboard-layout dashboard-role-${session.user.role}`}>
+      <DashboardSidebar session={session} missedCount={missedCount} motherId={result.data[0]?._id} onLogout={onLogout} />
+      <div className="dashboard-main">
+        <Header session={session} onLogout={onLogout} visitReminder={visitReminder} dashboard />
+        <div className="dashboard-workspace">
+          <main className="page-wrap dashboard-page">
+            <div className="page-heading dashboard-heading">
+              <div><span className="eyebrow">YOUR CARE OVERVIEW</span><h1>{session.user.role === "nurse" ? `${greeting}, ${session.user.name.split(" ")[0]}.` : `Welcome, ${session.user.name.split(" ")[0]}.`}</h1><p>{session.user.role === "nurse" ? "Here’s the latest across your maternal care list." : "Here’s your personalized visit plan."}</p></div>
+              {session.user.role === "nurse" && <Link className="button button-primary" to="/mothers/new"><span className="plus">+</span> Add a mother</Link>}
+            </div>
+            {session.user.role === "mother" && <VisitReminder state={visitReminder} />}
+            <div className="summary-grid dashboard-summary-grid">
+              {session.user.role === "nurse" ? <>
+                <SummaryCard label="MOTHERS IN CARE" value={result.pagination?.total ?? "—"} caption="Across your care list" icon="▦" />
+                <SummaryCard id="follow-ups" label="VISITS TO FOLLOW UP" value={analyticsError ? "—" : missedCount} caption="Past scheduled dates" icon="✓" tone="peach" />
+                <SummaryCard label="CARE PLANS" value={result.pagination?.total ?? "—"} caption="Active pregnancy journeys" icon="♡" tone="pink" />
+              </> : <>
+                <SummaryCard label="VISITS COMPLETED" value={visitReminder.loading ? "—" : `${completedVisits}/${motherVisits.length || 5}`} caption="Your care journey progress" icon="✓" />
+                <SummaryCard id="appointments" label="NEXT APPOINTMENT" value={nextVisit ? formatDate(nextVisit.visitDate) : "—"} caption={nextVisit ? `Visit ${nextVisit.visitNo} on your care plan` : "No visits remaining"} icon="▦" tone="peach" />
+                <SummaryCard label="EXPECTED DUE DATE" value={result.data[0] ? formatDate(result.data[0].dueDate) : "—"} caption="Your pregnancy milestone" icon="♡" tone="pink" />
+              </>}
+            </div>
+            {session.user.role === "nurse" && missed.length > 0 && <div className="notice dashboard-follow-up"><span aria-hidden="true">♟</span><p><strong>{missed.length} {missed.length === 1 ? "mother has" : "mothers have"} visits to follow up.</strong> Review their care plans below.</p><a href="#care-plans" aria-label="Review care plans">›</a></div>}
+            <div className="section-heading dashboard-section-heading" id="care-plans">
+              <div className="dashboard-section-title"><span className="dashboard-section-icon" aria-hidden="true">♟</span><div><h2>{session.user.role === "nurse" ? "Mother care plans" : "My care plan"}</h2><p>{session.user.role === "nurse" ? "A clear view of each journey and next step." : "Your visits, thoughtfully planned around your due date."}</p></div></div>
+              <span className="results-count">{result.pagination?.total ?? 0} {result.pagination?.total === 1 ? "profile" : "profiles"}</span>
+            </div>
+            {result.loading ? <LoadingState text="Loading care plans..." /> : result.error ? <ErrorState message={result.error} retry={load} /> : result.data.length === 0 ? <EmptyState title="No care plans yet" body={session.user.role === "nurse" ? "Add a mother to start tracking her visits." : "Your care plan will appear here."} /> : (
+              <div className="mother-grid">
+                {result.data.map((mother) => <MotherCard key={mother._id} mother={mother} token={session.token} />)}
+              </div>
+            )}
+            {!result.loading && result.pagination?.pages > 1 && <div className="pagination dashboard-pagination"><button className="button button-outline" disabled={page === 1} onClick={() => setPage(page - 1)}>← Previous</button><span>Page {page} of {result.pagination.pages}</span><button className="button button-outline" disabled={page === result.pagination.pages} onClick={() => setPage(page + 1)}>Next →</button></div>}
+          </main>
+          <ContactStrip />
         </div>
-        {session.user.role === "mother" && <VisitReminder state={visitReminder} />}
-        {session.user.role === "nurse" && (
-          <div className="summary-grid">
-            <SummaryCard label="MOTHERS IN CARE" value={result.pagination?.total ?? "—"} caption="Across your care list" icon="♡" />
-            <SummaryCard label="VISITS TO FOLLOW UP" value={analyticsError ? "—" : missedCount} caption="Past scheduled dates" icon="↗" tone="peach" />
-            <SummaryCard label="CARE PLANS" value={result.pagination?.total ?? "—"} caption="Active pregnancy journeys" icon="✳" tone="lavender" />
-          </div>
-        )}
-        {session.user.role === "nurse" && missed.length > 0 && <div className="notice"><span>!</span><p><strong>{missed.length} {missed.length === 1 ? "mother has" : "mothers have"} visits to follow up.</strong> Review their care plans below.</p></div>}
-        <div className="section-heading dashboard-section-heading"><div><h2>{session.user.role === "nurse" ? "Mother care plans" : "Your care plan"}</h2><p>{session.user.role === "nurse" ? "A clear view of each journey and next step." : "Your visits, thoughtfully planned around your due date."}</p></div><span className="results-count">{result.pagination?.total ?? 0} {result.pagination?.total === 1 ? "profile" : "profiles"}</span></div>
-        {result.loading ? <LoadingState text="Loading care plans..." /> : result.error ? <ErrorState message={result.error} retry={load} /> : result.data.length === 0 ? <EmptyState title="No care plans yet" body={session.user.role === "nurse" ? "Add a mother to start tracking her visits." : "Your care plan will appear here."} /> : (
-          <div className="mother-grid">
-            {result.data.map((mother) => <MotherCard key={mother._id} mother={mother} token={session.token} />)}
-          </div>
-        )}
-        {!result.loading && result.pagination?.pages > 1 && <div className="pagination"><button className="button button-outline" disabled={page === 1} onClick={() => setPage(page - 1)}>← Previous</button><span>Page {page} of {result.pagination.pages}</span><button className="button button-outline" disabled={page === result.pagination.pages} onClick={() => setPage(page + 1)}>Next →</button></div>}
-      </main>
-      <ContactStrip />
+      </div>
     </div>
+  );
+}
+
+function DashboardSidebar({ session, missedCount, motherId, onLogout }) {
+  const isNurse = session.user.role === "nurse";
+  return (
+    <aside className="dashboard-sidebar">
+      <Link to="/dashboard" className="sidebar-brand">
+        <span className="sidebar-brand-mark" aria-hidden="true">♡</span>
+        <span>Maternal Health<small>Visit Reminder</small></span>
+      </Link>
+      <nav className="sidebar-nav" aria-label="Dashboard navigation">
+        <Link className="sidebar-link active" to="/dashboard"><span aria-hidden="true">⌂</span>Dashboard</Link>
+        <a className="sidebar-link" href="#care-plans"><span aria-hidden="true">▤</span>{isNurse ? "Mother care plans" : "My care plan"}</a>
+        <a className="sidebar-link" href={isNurse ? "#follow-ups" : "#appointments"}><span aria-hidden="true">▦</span>Appointments{isNurse && missedCount > 0 && <span className="sidebar-badge">{missedCount}</span>}</a>
+        {isNurse
+          ? <a className="sidebar-link" href="#care-plans"><span aria-hidden="true">▣</span>Health Records</a>
+          : <Link className="sidebar-link" to={motherId ? `/mothers/${motherId}` : "/dashboard#care-plans"}><span aria-hidden="true">▣</span>Health Records</Link>}
+        <a className="sidebar-link" href={`mailto:${SUPPORT_EMAIL}`}><span aria-hidden="true">✉</span>Messages</a>
+        <button className="sidebar-link sidebar-disabled" type="button" disabled title="Settings are not available yet."><span aria-hidden="true">⚙</span>Settings</button>
+        <button className="sidebar-link sidebar-menu-logout" type="button" onClick={onLogout}><span aria-hidden="true">⇥</span>Log out</button>
+      </nav>
+      <div className="sidebar-bottom">
+        <span className="sidebar-mother-art" aria-hidden="true">♡</span>
+        <p>Healthy Mother.<br />Healthy Baby.<br />A Healthier World.</p>
+      </div>
+    </aside>
   );
 }
 
@@ -499,8 +545,8 @@ function VisitReminder({ state }) {
   );
 }
 
-function SummaryCard({ label, value, caption, icon, tone = "" }) {
-  return <div className="summary-card"><div className="summary-top"><span>{label}</span><span className={`summary-icon ${tone}`}>{icon}</span></div><strong>{value}</strong><small>{caption}</small></div>;
+function SummaryCard({ label, value, caption, icon, tone = "", id }) {
+  return <div className="summary-card" id={id}><div className="summary-top"><span>{label}</span><span className={`summary-icon ${tone}`}>{icon}</span></div><strong>{value}</strong><small>{caption}</small></div>;
 }
 
 function MotherCard({ mother }) {
@@ -516,10 +562,14 @@ function MotherCard({ mother }) {
   const completed = visits?.filter((visit) => visit.completedAt).length || 0;
   return (
     <Link to={`/mothers/${mother._id}`} className="mother-card">
-      <div className="mother-card-top"><div className="avatar">{mother.name.split(" ").map((part) => part[0]).slice(0, 2).join("")}</div><span className="card-arrow">↗</span></div>
-      <h3>{mother.name}</h3><span className="due-label">EXPECTED DUE DATE</span><p className="due-date">{formatDate(mother.dueDate)}</p>
-      <div className="card-divider" />
-      {error ? <span className="muted small">Progress unavailable</span> : visits ? <div className="mini-progress"><div className="progress-track"><span style={{ width: `${completed / 5 * 100}%` }} /></div><span>{completed}/5 visits</span></div> : <span className="muted small">Loading progress…</span>}
+      <div className="mother-card-main">
+        <div className="avatar">{mother.name.split(" ").map((part) => part[0]).slice(0, 2).join("")}</div>
+        <div className="mother-card-info"><h3>{mother.name}</h3><span className="due-label">EXPECTED DUE DATE</span><p className="due-date">{formatDate(mother.dueDate)}</p></div>
+        <span className="card-arrow" aria-hidden="true">↗</span>
+      </div>
+      <div className="mother-card-bottom">
+        {error ? <span className="muted small">Progress unavailable</span> : visits ? <><div className="progress-track"><span style={{ width: `${completed / 5 * 100}%` }} /></div><span>{completed}/5 visits</span></> : <span className="muted small">Loading progress…</span>}
+      </div>
     </Link>
   );
 }
