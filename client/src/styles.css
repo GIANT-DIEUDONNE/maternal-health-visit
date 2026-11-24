@@ -106,7 +106,14 @@ h1, h2, h3 { font-family: Manrope, sans-serif; letter-spacing: -1px; }
 .plain-link { padding: 0; border: 0; color: var(--green); background: transparent; cursor: pointer; font-size: 11px; font-weight: 700; }
 .recovery-contact { margin: 15px 0 0; text-align: center; color: #858d88; font-size: 10px; }
 .recovery-contact a { color: var(--green); font-weight: 700; white-space: nowrap; }
-.error-banner { padding: 11px 12px; border: 1px solid #f1d4d0; border-radius: 7px; background: #fff7f5; color: #9e4e45; font-size: 12px; }
+.field-input-wrap { position: relative; display: block; width: 100%; }
+.field-password .field-input-wrap input { padding-right: 45px; }
+.password-toggle { position: absolute; top: 50%; right: 11px; width: 29px; height: 29px; display: grid; place-items: center; padding: 5px; transform: translateY(-50%); border: 0; border-radius: 6px; color: #78688e; background: transparent; cursor: pointer; }
+.password-toggle:hover { color: #7011b2; background: #eee5f8; }
+.password-toggle:focus-visible { outline: 2px solid #8a35cc; outline-offset: 2px; }
+.password-toggle svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.error-banner { display: flex; align-items: center; gap: 10px; padding: 11px 12px; border: 1px solid #f3cfc9; border-radius: 8px; background: #fff8f6; color: #b9443a; font-size: 12px; line-height: 1.4; }
+.error-banner-icon { width: 19px; height: 19px; flex: 0 0 19px; display: grid; place-items: center; border: 1.5px solid currentColor; border-radius: 50%; font-size: 12px; font-weight: 800; }
 .form-page { max-width: 680px; margin: 0 auto; padding: 48px 24px 80px; }
 .back-link { display: inline-block; margin-bottom: 22px; color: #67786e; font-size: 12px; font-weight: 600; }
 .form-panel { padding: 32px; border: 1px solid var(--line); border-radius: 12px; background: white; }
@@ -422,6 +429,8 @@ h1, h2, h3 { font-family: Manrope, sans-serif; letter-spacing: -1px; }
 .signup-card .form-subtitle { margin-bottom: 16px; }
 .signup-card .form-stack { gap: 10px; }
 .signup-card .field input, .signup-card .field select { height: 40px; padding: 0 12px; border-color: #ded8eb; border-radius: 8px; background: #f8f6fc; }
+.signup-card .field-password .field-input-wrap input { padding-right: 42px; }
+.signup-card .password-toggle { right: 7px; }
 .signup-card .field input:focus, .signup-card .field select:focus { border-color: #8a35cc; box-shadow: 0 0 0 3px #8a35cc20; }
 .signup-card .full-width { margin-top: 1px; }
 .login-footer { min-height: 58px; display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 9px max(calc((100vw - 1360px) / 2), 4vw); color: #5b128d; background: #f0e0ff; }

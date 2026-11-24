@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import { Link, Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import { api } from "./api.js";
 
@@ -535,9 +535,42 @@ function VisitRow({ visit, canLog, loading, onLog }) {
 }
 
 function Field({ label, value, onChange, ...inputProps }) {
-  return <label className="field"><span>{label}</span><input value={value} onChange={(event) => onChange(event.target.value)} {...inputProps} /></label>;
+  const inputId = useId();
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const isPassword = inputProps.type === "password";
+  const type = isPassword && passwordVisible ? "text" : inputProps.type;
+  return (
+    <div className={`field${isPassword ? " field-password" : ""}`}>
+      <label htmlFor={inputId}>{label}</label>
+      <span className="field-input-wrap">
+        <input id={inputId} value={value} onChange={(event) => onChange(event.target.value)} {...inputProps} type={type} />
+        {isPassword && (
+          <button
+            className="password-toggle"
+            type="button"
+            aria-label={passwordVisible ? "Hide password" : "Show password"}
+            aria-pressed={passwordVisible}
+            onClick={() => setPasswordVisible((visible) => !visible)}
+          >
+            {passwordVisible ? (
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18M10.6 10.6a2 2 0 002.8 2.8M9.9 5.2A10.7 10.7 0 0112 5c5.5 0 9 5 10 7a14 14 0 01-3 3.8M6.2 6.2C3.9 7.6 2.5 9.8 2 12c.5 1 4 7 10 7a10 10 0 004.1-.9" /></svg>
+            ) : (
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg>
+            )}
+          </button>
+        )}
+      </span>
+    </div>
+  );
 }
-function ErrorBanner({ children }) { return <div className="error-banner" role="alert">{children}</div>; }
+function ErrorBanner({ children }) {
+  return (
+    <div className="error-banner" role="alert">
+      <span className="error-banner-icon" aria-hidden="true">!</span>
+      <span>{children}</span>
+    </div>
+  );
+}
 function LoadingState({ text }) { return <div className="state-card"><span className="spinner" /><p>{text}</p></div>; }
 function ErrorState({ message, retry }) { return <div className="state-card state-error"><span className="state-symbol">!</span><h3>Something went wrong</h3><p>{message}</p><button className="button button-outline" onClick={retry}>Try again</button></div>; }
 function EmptyState({ title, body }) { return <div className="state-card"><span className="empty-symbol">✳</span><h3>{title}</h3><p>{body}</p></div>; }
