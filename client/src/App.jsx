@@ -242,7 +242,7 @@ function AuthPage({ register = false, onAuthenticated }) {
             <li><span aria-hidden="true">✓</span>Monitor<br />Health Progress</li>
             <li><span aria-hidden="true">♥</span>Better Care<br />for You &amp; Baby</li>
           </ul>
-          <p className="login-tagline">Healthy Mother. Healthy Baby. A Healthier Rwanda.</p>
+          <p className="login-tagline">Healthy Mother. Healthy Baby. A Healthier World.</p>
         </section>
         {formCard}
       </main>
