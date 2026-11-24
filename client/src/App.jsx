@@ -16,7 +16,7 @@ function App() {
   const onAuthenticated = (value) => {
     localStorage.setItem("maternal-session", JSON.stringify(value));
     setSession(value);
-    navigate("/");
+    navigate("/dashboard");
   };
   const logout = () => {
     localStorage.removeItem("maternal-session");
@@ -28,13 +28,127 @@ function App() {
     <div className="app-shell">
       {session && <Header session={session} onLogout={logout} />}
       <Routes>
-        <Route path="/login" element={session ? <Navigate to="/" replace /> : <AuthPage onAuthenticated={onAuthenticated} />} />
-        <Route path="/register" element={session ? <Navigate to="/" replace /> : <AuthPage register onAuthenticated={onAuthenticated} />} />
-        <Route path="/" element={<Protected session={session}><Dashboard session={session} /></Protected>} />
+        <Route path="/" element={session ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
+        <Route path="/login" element={session ? <Navigate to="/dashboard" replace /> : <AuthPage onAuthenticated={onAuthenticated} />} />
+        <Route path="/register" element={session ? <Navigate to="/dashboard" replace /> : <AuthPage register onAuthenticated={onAuthenticated} />} />
+        <Route path="/dashboard" element={<Protected session={session}><Dashboard session={session} /></Protected>} />
         <Route path="/mothers/new" element={<Protected session={session} role="nurse"><MotherForm session={session} /></Protected>} />
         <Route path="/mothers/:id" element={<Protected session={session}><MotherDetail session={session} /></Protected>} />
-        <Route path="*" element={<Navigate to={session ? "/" : "/login"} replace />} />
+        <Route path="*" element={<Navigate to={session ? "/dashboard" : "/"} replace />} />
       </Routes>
+    </div>
+  );
+}
+
+function LandingPage() {
+  return (
+    <div className="landing">
+      <header className="landing-header">
+        <a className="landing-brand" href="/" aria-label="Maternal Health Visit Reminder home">
+          <span className="landing-brand-mark" aria-hidden="true">♡</span>
+          <span>Maternal Health<span>Visit Reminder</span></span>
+        </a>
+        <nav className="landing-nav" aria-label="Main navigation">
+          <a className="landing-nav-active" href="#home">Home</a>
+          <a href="#about">About</a>
+          <a href="#features">Features</a>
+          <a href="#how-it-works">How it works</a>
+        </nav>
+        <div className="landing-actions">
+          <Link className="landing-login" to="/login">Log in</Link>
+          <Link className="landing-signup" to="/register">Create account</Link>
+        </div>
+      </header>
+
+      <main>
+        <section className="landing-hero" id="home">
+          <div className="landing-hero-copy">
+            <span className="landing-kicker"><span aria-hidden="true">♡</span> Support for every step</span>
+            <h1>Stay on track with your <span>maternal care.</span></h1>
+            <p>Keep prenatal visits organized, follow your progress, and make it easier for mothers and nurses to stay connected throughout pregnancy.</p>
+            <div className="landing-hero-actions">
+              <Link className="landing-primary-button" to="/register">Get started <span aria-hidden="true">→</span></Link>
+              <a className="landing-secondary-button" href="#how-it-works">See how it works</a>
+            </div>
+            <ul className="landing-trust-list">
+              <li><span aria-hidden="true">✓</span> Due-date based visit plan</li>
+              <li><span aria-hidden="true">✓</span> Progress at a glance</li>
+            </ul>
+          </div>
+          <div className="landing-hero-art" aria-label="Preview of a maternal care plan">
+            <div className="hero-orbit hero-orbit-one" />
+            <div className="hero-orbit hero-orbit-two" />
+            <div className="care-preview">
+              <div className="care-preview-heading">
+                <span className="care-preview-icon" aria-hidden="true">♡</span>
+                <div><small>YOUR MATERNAL CARE</small><strong>A plan for every visit</strong></div>
+                <span className="care-preview-status">On track</span>
+              </div>
+              <div className="care-preview-progress">
+                <div className="care-preview-progress-copy"><span>Visit progress</span><strong>2 of 5 visits</strong></div>
+                <div className="care-preview-track"><span /></div>
+              </div>
+              <div className="care-preview-divider" />
+              <span className="care-preview-label">YOUR VISIT PLAN</span>
+              <div className="care-visit care-visit-done"><span className="care-visit-check" aria-hidden="true">✓</span><span><strong>First check-in</strong><small>Completed with your nurse</small></span><span className="care-visit-tag">Done</span></div>
+              <div className="care-visit care-visit-done"><span className="care-visit-check" aria-hidden="true">✓</span><span><strong>Second check-in</strong><small>Progress recorded</small></span><span className="care-visit-tag">Done</span></div>
+              <div className="care-visit care-visit-next"><span className="care-visit-number">03</span><span><strong>Next check-in</strong><small>See your planned visit date</small></span><span className="care-visit-arrow" aria-hidden="true">→</span></div>
+            </div>
+            <div className="hero-note"><span aria-hidden="true">✦</span><span>Care that keeps you moving forward</span></div>
+          </div>
+        </section>
+
+        <section className="landing-about" id="about">
+          <span className="landing-section-kicker">CARE, MADE CLEAR</span>
+          <h2>One place to follow your pregnancy visits</h2>
+          <p>Know what’s coming up, see what’s been completed, and help your care team follow up when a visit is missed.</p>
+        </section>
+
+        <section className="landing-features" id="features" aria-label="Platform features">
+          <article className="landing-feature-card">
+            <span className="landing-feature-icon feature-purple" aria-hidden="true">▦</span>
+            <h3>Planned around your due date</h3>
+            <p>Get a clear schedule of five prenatal check-ins based on your expected due date.</p>
+          </article>
+          <article className="landing-feature-card">
+            <span className="landing-feature-icon feature-pink" aria-hidden="true">♡</span>
+            <h3>Track visit progress</h3>
+            <p>See completed and upcoming visits together in your personal care plan.</p>
+          </article>
+          <article className="landing-feature-card">
+            <span className="landing-feature-icon feature-green" aria-hidden="true">✓</span>
+            <h3>Support timely follow-up</h3>
+            <p>Nurses can review missed visits, update care plans, and record completed check-ins.</p>
+          </article>
+          <article className="landing-feature-card">
+            <span className="landing-feature-icon feature-blue" aria-hidden="true">↗</span>
+            <h3>Care team overview</h3>
+            <p>Nurses can see care plans and follow-up needs across the mothers they support.</p>
+          </article>
+        </section>
+
+        <section className="landing-how" id="how-it-works">
+          <div className="landing-how-heading">
+            <span className="landing-section-kicker">A SIMPLE WAY TO STAY ORGANIZED</span>
+            <h2>How it works</h2>
+          </div>
+          <div className="landing-steps">
+            <article className="landing-step"><span className="step-number">01</span><div><h3>Create your account</h3><p>Sign up as a mother or join as a nurse with your clinic invite code.</p></div></article>
+            <article className="landing-step"><span className="step-number">02</span><div><h3>View the visit plan</h3><p>Your care plan shows the visits scheduled around the due date.</p></div></article>
+            <article className="landing-step"><span className="step-number">03</span><div><h3>Keep progress up to date</h3><p>Your nurse records visits and follows up on missed check-ins.</p></div></article>
+          </div>
+          <Link className="landing-primary-button landing-how-button" to="/register">Create your account <span aria-hidden="true">→</span></Link>
+        </section>
+      </main>
+
+      <footer className="landing-footer">
+        <a className="landing-brand landing-footer-brand" href="#home">
+          <span className="landing-brand-mark" aria-hidden="true">♡</span>
+          <span>Maternal Health<span>Visit Reminder</span></span>
+        </a>
+        <p>Thoughtful support for a healthier pregnancy journey.</p>
+        <a href="#home" className="landing-back-top">Back to top ↑</a>
+      </footer>
     </div>
   );
 }
