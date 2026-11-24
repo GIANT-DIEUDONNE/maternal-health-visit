@@ -201,6 +201,22 @@ h1, h2, h3 { font-family: Manrope, sans-serif; letter-spacing: -1px; }
 .settings-support { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 19px; border: 1px solid #dfc7f5; border-radius: 13px; background: #f3e7ff; }
 .settings-support a { display: inline-flex; align-items: center; gap: 7px; color: #6f1ab0; font-size: 10px; font-weight: 700; white-space: nowrap; }
 .settings-support a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.directory-page { max-width: 1200px; }
+.message-list { display: grid; gap: 11px; }
+.message-contact-card { min-width: 0; display: flex; align-items: center; gap: 13px; padding: 14px 16px; border: 1px solid #e7d6fa; border-radius: 14px; background: #ffffffed; box-shadow: 0 4px 13px #4b16780c; }
+.message-contact-info { min-width: 0; flex: 1; display: grid; gap: 4px; }
+.message-contact-info strong { overflow: hidden; color: #30154e; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.message-contact-info > span, .message-contact-info small { color: #795f91; font-size: 9px; }
+.message-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+.message-action { min-height: 31px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; padding: 0 10px; border: 1px solid #e5d5f3; border-radius: 18px; color: #6820a2; background: #fbf7ff; font-size: 9px; font-weight: 700; white-space: nowrap; }
+.message-action:hover { border-color: #b97ee4; background: #f3e7ff; }
+.message-action:focus-visible, .message-actions .button:focus-visible { outline: 3px solid #9a55d970; outline-offset: 2px; }
+.message-support-card { display: flex; align-items: flex-start; gap: 17px; padding: 22px; border: 1px solid #e4d3fa; border-radius: 16px; background: #ffffffed; box-shadow: 0 5px 16px #4e127214; }
+.message-support-icon { width: 44px; height: 44px; flex: 0 0 44px; display: grid; place-items: center; border-radius: 50%; color: #7923c7; background: #f0dfff; font: 28px Georgia, serif; }
+.message-support-card h2 { margin: 0 0 6px; color: #321453; font-size: 16px; }
+.message-support-card p { margin: 0 0 16px; color: #765b90; font-size: 11px; line-height: 1.6; }
+.message-actions .button { min-height: 34px; padding: 0 12px; border-color: #e5d5f3; font-size: 9px; }
+.message-actions .button-primary { border-color: transparent; color: #fff; }
 @media (max-width: 1000px) {
   .dashboard-layout { grid-template-columns: 170px minmax(0, 1fr); }
   .dashboard-sidebar { padding-right: 9px; padding-left: 9px; }
@@ -362,10 +378,15 @@ h1, h2, h3 { font-family: Manrope, sans-serif; letter-spacing: -1px; }
   .sidebar-link { min-width: 0; min-height: 45px; flex: 1; flex-direction: column; justify-content: center; gap: 2px; padding: 3px 4px; border-radius: 10px; font-size: 8px; text-align: center; white-space: nowrap; }
   .sidebar-link > span:first-child { width: auto; flex: 0 0 auto; font-size: 16px; }
   .sidebar-badge { position: absolute; transform: translate(17px, -9px); min-width: 15px; height: 15px; font-size: 8px; }
-  .sidebar-nav > .sidebar-link:nth-child(5), .sidebar-nav > .sidebar-link:nth-child(7) { display: none; }
+  .sidebar-nav > .sidebar-link:nth-child(2), .sidebar-nav > .sidebar-link:nth-child(7) { display: none; }
   .settings-page { padding-top: 32px; }
   .settings-card { padding: 17px 16px; }
   .settings-support { align-items: flex-start; flex-direction: column; gap: 11px; }
+  .message-contact-card { flex-wrap: wrap; gap: 10px; padding: 12px; }
+  .message-contact-info { min-width: calc(100% - 60px); }
+  .message-contact-card .message-actions { width: 100%; padding-left: 52px; }
+  .message-support-card { padding: 17px 14px; }
+  .message-support-card .message-actions { gap: 6px; }
   .dashboard-contact-inner { align-items: flex-start; flex-direction: column; gap: 15px; padding: 18px; }
   .dashboard-contact-details { padding-left: 12px; }
   .dashboard-contact-links { align-items: flex-start; flex-direction: column; gap: 9px; }

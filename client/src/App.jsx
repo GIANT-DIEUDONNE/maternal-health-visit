@@ -31,7 +31,7 @@ function App() {
   const [remindersEnabled, setRemindersEnabled] = useState(() => readReminderPreference(session?.user?.email));
   const location = useLocation();
   const navigate = useNavigate();
-  const dashboardArea = ["/dashboard", "/settings"].includes(location.pathname);
+  const dashboardArea = ["/dashboard", "/settings", "/messages", "/health-records"].includes(location.pathname);
   const visitReminder = useVisitReminder(session?.token, session?.user?.role === "mother", remindersEnabled);
   const onAuthenticated = (value) => {
     localStorage.setItem("maternal-session", JSON.stringify(value));
@@ -60,6 +60,8 @@ function App() {
         <Route path="/register" element={session ? <Navigate to="/dashboard" replace /> : <AuthPage register onAuthenticated={onAuthenticated} />} />
         <Route path="/dashboard" element={<Protected session={session}><Dashboard session={session} visitReminder={visitReminder} onLogout={logout} /></Protected>} />
         <Route path="/settings" element={<Protected session={session}><SettingsPage session={session} visitReminder={visitReminder} remindersEnabled={remindersEnabled} onReminderPreferenceChange={updateReminderPreference} onLogout={logout} /></Protected>} />
+        <Route path="/messages" element={<Protected session={session}><MessagesPage session={session} visitReminder={visitReminder} onLogout={logout} /></Protected>} />
+        <Route path="/health-records" element={<Protected session={session}><HealthRecordsPage session={session} visitReminder={visitReminder} onLogout={logout} /></Protected>} />
         <Route path="/mothers/new" element={<Protected session={session} role="nurse"><MotherForm session={session} /></Protected>} />
         <Route path="/mothers/:id" element={<Protected session={session}><MotherDetail session={session} /></Protected>} />
         <Route path="*" element={<Navigate to={session ? "/dashboard" : "/"} replace />} />
@@ -455,7 +457,7 @@ function Dashboard({ session, visitReminder, onLogout }) {
 
   return (
     <div className={`dashboard-layout dashboard-role-${session.user.role}`}>
-      <DashboardSidebar session={session} activePage="dashboard" missedCount={missedCount} motherId={result.data[0]?._id} onLogout={onLogout} />
+      <DashboardSidebar session={session} activePage="dashboard" missedCount={missedCount} onLogout={onLogout} />
       <div className="dashboard-main">
         <Header session={session} onLogout={onLogout} visitReminder={visitReminder} dashboard />
         <div className="dashboard-workspace">
@@ -566,12 +568,134 @@ function SettingsPage({ session, visitReminder, remindersEnabled, onReminderPref
   );
 }
 
-function DashboardSidebar({ session, activePage, missedCount, motherId, onLogout }) {
+function HealthRecordsPage({ session, visitReminder, onLogout }) {
+  const [result, setResult] = useState({ loading: true, error: "", data: [], pagination: null });
+  const [page, setPage] = useState(1);
+  const load = useCallback(async () => {
+    setResult((current) => ({ ...current, loading: true, error: "" }));
+    try {
+      const response = await api(`/mothers?page=${page}&limit=6`, { token: session.token });
+      setResult({ loading: false, error: "", data: response.data, pagination: response.pagination });
+    } catch (error) {
+      setResult((current) => ({ ...current, loading: false, error: error.message }));
+    }
+  }, [page, session.token]);
+  useEffect(() => { load(); }, [load]);
+
+  return (
+    <div className={`dashboard-layout dashboard-role-${session.user.role}`}>
+      <DashboardSidebar session={session} activePage="health-records" missedCount={0} onLogout={onLogout} />
+      <div className="dashboard-main">
+        <Header session={session} onLogout={onLogout} visitReminder={visitReminder} dashboard />
+        <div className="dashboard-workspace">
+          <main className="page-wrap dashboard-page directory-page">
+            <div className="page-heading dashboard-heading">
+              <div><span className="eyebrow">MATERNAL CARE</span><h1>Health records</h1><p>{session.user.role === "nurse" ? "Open a care record to review visit progress and details." : "Your pregnancy care record and scheduled visits."}</p></div>
+              {session.user.role === "nurse" && <Link className="button button-primary" to="/mothers/new"><span className="plus">+</span> Add a mother</Link>}
+            </div>
+            <div className="section-heading dashboard-section-heading"><div className="dashboard-section-title"><span className="dashboard-section-icon" aria-hidden="true">▣</span><div><h2>{session.user.role === "nurse" ? "Mother records" : "Your record"}</h2><p>Select a record to see the full care plan and visit history.</p></div></div><span className="results-count">{result.pagination?.total ?? 0} {result.pagination?.total === 1 ? "record" : "records"}</span></div>
+            {result.loading ? <LoadingState text="Loading health records..." /> : result.error ? <ErrorState message={result.error} retry={load} /> : result.data.length === 0 ? <EmptyState title="No health records yet" body={session.user.role === "nurse" ? "Add a mother to create her care record." : "Your care record will appear here."} /> : (
+              <div className="mother-grid">{result.data.map((mother) => <MotherCard key={mother._id} mother={mother} token={session.token} />)}</div>
+            )}
+            {!result.loading && result.pagination?.pages > 1 && <div className="pagination dashboard-pagination"><button className="button button-outline" disabled={page === 1} onClick={() => setPage(page - 1)}>← Previous</button><span>Page {page} of {result.pagination.pages}</span><button className="button button-outline" disabled={page === result.pagination.pages} onClick={() => setPage(page + 1)}>Next →</button></div>}
+          </main>
+          <ContactStrip />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MessagesPage({ session, visitReminder, onLogout }) {
+  const [result, setResult] = useState({ loading: true, error: "", data: [], pagination: null });
+  const [page, setPage] = useState(1);
   const isNurse = session.user.role === "nurse";
-  const carePlansPath = activePage === "settings" ? "/dashboard#care-plans" : "#care-plans";
-  const appointmentsPath = activePage === "settings"
-    ? `/dashboard#${isNurse ? "follow-ups" : "appointments"}`
-    : `#${isNurse ? "follow-ups" : "appointments"}`;
+  const load = useCallback(async () => {
+    if (!isNurse) {
+      setResult({ loading: false, error: "", data: [], pagination: null });
+      return;
+    }
+    setResult((current) => ({ ...current, loading: true, error: "" }));
+    try {
+      const response = await api(`/mothers?page=${page}&limit=6`, { token: session.token });
+      setResult({ loading: false, error: "", data: response.data, pagination: response.pagination });
+    } catch (error) {
+      setResult((current) => ({ ...current, loading: false, error: error.message }));
+    }
+  }, [isNurse, page, session.token]);
+  useEffect(() => { load(); }, [load]);
+
+  return (
+    <div className={`dashboard-layout dashboard-role-${session.user.role}`}>
+      <DashboardSidebar session={session} activePage="messages" missedCount={0} onLogout={onLogout} />
+      <div className="dashboard-main">
+        <Header session={session} onLogout={onLogout} visitReminder={visitReminder} dashboard />
+        <div className="dashboard-workspace">
+          <main className="page-wrap dashboard-page directory-page">
+            <div className="page-heading dashboard-heading">
+              <div><span className="eyebrow">STAY CONNECTED</span><h1>Messages</h1><p>{isNurse ? "Contact mothers directly using the messaging apps on your device." : "Get in touch with the Maternal Health support team."}</p></div>
+            </div>
+            {isNurse ? <>
+              <div className="section-heading dashboard-section-heading"><div className="dashboard-section-title"><span className="dashboard-section-icon" aria-hidden="true">✉</span><div><h2>Contact a mother</h2><p>Choose a contact method for a mother in your care.</p></div></div><span className="results-count">{result.pagination?.total ?? 0} {result.pagination?.total === 1 ? "mother" : "mothers"}</span></div>
+              {result.loading ? <LoadingState text="Loading mother contacts..." /> : result.error ? <ErrorState message={result.error} retry={load} /> : result.data.length === 0 ? <EmptyState title="No mother contacts yet" body="Mother contacts will appear here when care plans are added." /> : (
+                <div className="message-list">{result.data.map((mother) => <MotherContactCard key={mother._id} mother={mother} />)}</div>
+              )}
+              {!result.loading && result.pagination?.pages > 1 && <div className="pagination dashboard-pagination"><button className="button button-outline" disabled={page === 1} onClick={() => setPage(page - 1)}>← Previous</button><span>Page {page} of {result.pagination.pages}</span><button className="button button-outline" disabled={page === result.pagination.pages} onClick={() => setPage(page + 1)}>Next →</button></div>}
+            </> : (
+              <section className="message-support-card">
+                <span className="message-support-icon" aria-hidden="true">♡</span>
+                <div><h2>Maternal Health Support</h2><p>Contact us about your care plan or account. For urgent medical concerns, contact your local healthcare provider.</p>
+                  <div className="message-actions">
+                    <a className="button button-primary" href={`tel:${SUPPORT_PHONE}`}>Call support</a>
+                    <a className="button button-outline" href={`sms:${phoneForSms(SUPPORT_PHONE)}`}>Send SMS</a>
+                    <a className="button button-outline" href={`mailto:${SUPPORT_EMAIL}`}>Email support</a>
+                    <a className="button button-outline" href={whatsAppUrl(SUPPORT_PHONE)} target="_blank" rel="noopener noreferrer">WhatsApp</a>
+                  </div>
+                </div>
+              </section>
+            )}
+          </main>
+          <ContactStrip />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MotherContactCard({ mother }) {
+  const whatsApp = whatsAppUrl(mother.phone);
+  return (
+    <article className="message-contact-card">
+      <span className="settings-avatar" aria-hidden="true">{mother.name.split(/\s+/).map((part) => part[0]).slice(0, 2).join("").toUpperCase()}</span>
+      <div className="message-contact-info"><strong>{mother.name}</strong><span>{mother.phone}</span><small>Due date: {formatDate(mother.dueDate)}</small></div>
+      <div className="message-actions">
+        <a className="message-action" href={`tel:${phoneForSms(mother.phone)}`} aria-label={`Call ${mother.name}`}><span aria-hidden="true">☎</span>Call</a>
+        <a className="message-action" href={`sms:${phoneForSms(mother.phone)}`} aria-label={`Text ${mother.name}`}><span aria-hidden="true">✉</span>SMS</a>
+        {whatsApp && <a className="message-action" href={whatsApp} target="_blank" rel="noopener noreferrer" aria-label={`Message ${mother.name} on WhatsApp`}><span aria-hidden="true">◉</span>WhatsApp</a>}
+      </div>
+    </article>
+  );
+}
+
+function phoneForSms(phone) {
+  const value = String(phone || "").trim();
+  const digits = value.replace(/\D/g, "");
+  return value.startsWith("+") ? `+${digits}` : digits;
+}
+
+function whatsAppUrl(phone) {
+  const value = String(phone || "").trim();
+  const digits = value.replace(/\D/g, "");
+  if (value.startsWith("+")) return digits ? `https://wa.me/${digits}` : "";
+  if (digits.startsWith("0")) return `https://wa.me/250${digits.slice(1)}`;
+  return "";
+}
+
+function DashboardSidebar({ session, activePage, missedCount, onLogout }) {
+  const isNurse = session.user.role === "nurse";
+  const isDashboard = activePage === "dashboard";
+  const carePlansPath = isDashboard ? "#care-plans" : "/dashboard#care-plans";
+  const appointmentsPath = isDashboard ? `#${isNurse ? "follow-ups" : "appointments"}` : `/dashboard#${isNurse ? "follow-ups" : "appointments"}`;
   return (
     <aside className="dashboard-sidebar">
       <Link to="/dashboard" className="sidebar-brand">
@@ -580,16 +704,14 @@ function DashboardSidebar({ session, activePage, missedCount, motherId, onLogout
       </Link>
       <nav className="sidebar-nav" aria-label="Dashboard navigation">
         <Link className={`sidebar-link${activePage === "dashboard" ? " active" : ""}`} to="/dashboard"><span aria-hidden="true">⌂</span>Dashboard</Link>
-        {activePage === "settings"
-          ? <Link className="sidebar-link" to={carePlansPath}><span aria-hidden="true">▤</span>{isNurse ? "Mother care plans" : "My care plan"}</Link>
-          : <a className="sidebar-link" href={carePlansPath}><span aria-hidden="true">▤</span>{isNurse ? "Mother care plans" : "My care plan"}</a>}
-        {activePage === "settings"
-          ? <Link className="sidebar-link" to={appointmentsPath}><span aria-hidden="true">▦</span>Appointments{isNurse && missedCount > 0 && <span className="sidebar-badge">{missedCount}</span>}</Link>
-          : <a className="sidebar-link" href={appointmentsPath}><span aria-hidden="true">▦</span>Appointments{isNurse && missedCount > 0 && <span className="sidebar-badge">{missedCount}</span>}</a>}
-        {isNurse
-          ? <a className="sidebar-link" href="#care-plans"><span aria-hidden="true">▣</span>Health Records</a>
-          : <Link className="sidebar-link" to={motherId ? `/mothers/${motherId}` : "/dashboard#care-plans"}><span aria-hidden="true">▣</span>Health Records</Link>}
-        <a className="sidebar-link" href={`mailto:${SUPPORT_EMAIL}`}><span aria-hidden="true">✉</span>Messages</a>
+        {isDashboard
+          ? <a className="sidebar-link" href={carePlansPath}><span aria-hidden="true">▤</span>{isNurse ? "Mother care plans" : "My care plan"}</a>
+          : <Link className="sidebar-link" to={carePlansPath}><span aria-hidden="true">▤</span>{isNurse ? "Mother care plans" : "My care plan"}</Link>}
+        {isDashboard
+          ? <a className="sidebar-link" href={appointmentsPath}><span aria-hidden="true">▦</span>Appointments{isNurse && missedCount > 0 && <span className="sidebar-badge">{missedCount}</span>}</a>
+          : <Link className="sidebar-link" to={appointmentsPath}><span aria-hidden="true">▦</span>Appointments{isNurse && missedCount > 0 && <span className="sidebar-badge">{missedCount}</span>}</Link>}
+        <Link className={`sidebar-link${activePage === "health-records" ? " active" : ""}`} to="/health-records"><span aria-hidden="true">▣</span>Health Records</Link>
+        <Link className={`sidebar-link${activePage === "messages" ? " active" : ""}`} to="/messages"><span aria-hidden="true">✉</span>Messages</Link>
         <Link className={`sidebar-link${activePage === "settings" ? " active" : ""}`} to="/settings"><span aria-hidden="true">⚙</span>Settings</Link>
         <button className="sidebar-link sidebar-menu-logout" type="button" onClick={onLogout}><span aria-hidden="true">⇥</span>Log out</button>
       </nav>
