@@ -2,6 +2,8 @@
 
 Maternal health visit reminders built with **React + Express + MongoDB**. The API calculates five scheduled visits from each mother's due date (32, 24, 16, 8, and 2 weeks before), flags past uncompleted visits as missed, and prevents logging a later visit before the previous one.
 
+Mother accounts see an in-app dashboard reminder the day before a scheduled visit. It appears when they sign in; email, SMS, and browser push notifications are not configured.
+
 ## Run locally
 
 1. Install Node.js and MongoDB Community Server, then start MongoDB.

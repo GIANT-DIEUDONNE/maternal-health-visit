@@ -75,26 +75,13 @@ function LandingPage() {
               <li><span aria-hidden="true">✓</span> Progress at a glance</li>
             </ul>
           </div>
-          <div className="landing-hero-art" aria-label="Preview of a maternal care plan">
-            <div className="hero-orbit hero-orbit-one" />
-            <div className="hero-orbit hero-orbit-two" />
-            <div className="care-preview">
-              <div className="care-preview-heading">
-                <span className="care-preview-icon" aria-hidden="true">♡</span>
-                <div><small>YOUR MATERNAL CARE</small><strong>A plan for every visit</strong></div>
-                <span className="care-preview-status">On track</span>
+          <div className="landing-hero-art">
+            <div className="landing-photo" role="img" aria-label="A pregnant mother meeting with a nurse for prenatal care">
+              <div className="photo-caption">
+                <span aria-hidden="true">♡</span>
+                <div><strong>Care, together</strong><small>Support for every step</small></div>
               </div>
-              <div className="care-preview-progress">
-                <div className="care-preview-progress-copy"><span>Visit progress</span><strong>2 of 5 visits</strong></div>
-                <div className="care-preview-track"><span /></div>
-              </div>
-              <div className="care-preview-divider" />
-              <span className="care-preview-label">YOUR VISIT PLAN</span>
-              <div className="care-visit care-visit-done"><span className="care-visit-check" aria-hidden="true">✓</span><span><strong>First check-in</strong><small>Completed with your nurse</small></span><span className="care-visit-tag">Done</span></div>
-              <div className="care-visit care-visit-done"><span className="care-visit-check" aria-hidden="true">✓</span><span><strong>Second check-in</strong><small>Progress recorded</small></span><span className="care-visit-tag">Done</span></div>
-              <div className="care-visit care-visit-next"><span className="care-visit-number">03</span><span><strong>Next check-in</strong><small>See your planned visit date</small></span><span className="care-visit-arrow" aria-hidden="true">→</span></div>
             </div>
-            <div className="hero-note"><span aria-hidden="true">✦</span><span>Care that keeps you moving forward</span></div>
           </div>
         </section>
 
@@ -116,14 +103,14 @@ function LandingPage() {
             <p>See completed and upcoming visits together in your personal care plan.</p>
           </article>
           <article className="landing-feature-card">
+            <span className="landing-feature-icon feature-purple" aria-hidden="true">🔔</span>
+            <h3>Get an in-app reminder</h3>
+            <p>Sign in to your dashboard the day before a scheduled visit to see your reminder.</p>
+          </article>
+          <article className="landing-feature-card">
             <span className="landing-feature-icon feature-green" aria-hidden="true">✓</span>
             <h3>Support timely follow-up</h3>
             <p>Nurses can review missed visits, update care plans, and record completed check-ins.</p>
-          </article>
-          <article className="landing-feature-card">
-            <span className="landing-feature-icon feature-blue" aria-hidden="true">↗</span>
-            <h3>Care team overview</h3>
-            <p>Nurses can see care plans and follow-up needs across the mothers they support.</p>
           </article>
         </section>
 
@@ -135,7 +122,7 @@ function LandingPage() {
           <div className="landing-steps">
             <article className="landing-step"><span className="step-number">01</span><div><h3>Create your account</h3><p>Sign up as a mother or join as a nurse with your clinic invite code.</p></div></article>
             <article className="landing-step"><span className="step-number">02</span><div><h3>View the visit plan</h3><p>Your care plan shows the visits scheduled around the due date.</p></div></article>
-            <article className="landing-step"><span className="step-number">03</span><div><h3>Keep progress up to date</h3><p>Your nurse records visits and follows up on missed check-ins.</p></div></article>
+            <article className="landing-step"><span className="step-number">03</span><div><h3>See your reminder</h3><p>Sign in the day before your scheduled visit to see a reminder on your dashboard.</p></div></article>
           </div>
           <Link className="landing-primary-button landing-how-button" to="/register">Create your account <span aria-hidden="true">→</span></Link>
         </section>
@@ -255,6 +242,7 @@ function Dashboard({ session }) {
         <div><span className="eyebrow">YOUR CARE OVERVIEW</span><h1>{session.user.role === "nurse" ? "Good morning, care team." : `Welcome, ${session.user.name.split(" ")[0]}.`}</h1><p>{session.user.role === "nurse" ? "Here’s the latest across your maternal care list." : "Here’s your personalized visit plan."}</p></div>
         {session.user.role === "nurse" && <Link className="button button-primary" to="/mothers/new"><span className="plus">+</span> Add a mother</Link>}
       </div>
+      {session.user.role === "mother" && <VisitReminder token={session.token} />}
       {session.user.role === "nurse" && (
         <div className="summary-grid">
           <SummaryCard label="MOTHERS IN CARE" value={result.pagination?.total ?? "—"} caption="Across your care list" icon="♡" />
@@ -271,6 +259,33 @@ function Dashboard({ session }) {
       )}
       {!result.loading && result.pagination?.pages > 1 && <div className="pagination"><button className="button button-outline" disabled={page === 1} onClick={() => setPage(page - 1)}>← Previous</button><span>Page {page} of {result.pagination.pages}</span><button className="button button-outline" disabled={page === result.pagination.pages} onClick={() => setPage(page + 1)}>Next →</button></div>}
     </main>
+  );
+}
+
+function VisitReminder({ token }) {
+  const [state, setState] = useState({ loading: true, error: "", visit: null });
+  useEffect(() => {
+    let active = true;
+    api("/visits?page=1&limit=100", { token })
+      .then(({ data }) => {
+        const tomorrow = startOfUtcDay(new Date()).getTime() + 86400000;
+        const visit = data.find((item) => !item.completedAt && startOfUtcDay(item.visitDate).getTime() === tomorrow);
+        if (active) setState({ loading: false, error: "", visit: visit || null });
+      })
+      .catch((error) => {
+        if (active) setState({ loading: false, error: error.message, visit: null });
+      });
+    return () => { active = false; };
+  }, [token]);
+
+  if (state.loading || (!state.error && !state.visit)) return null;
+  if (state.error) return <div className="error-banner visit-reminder-error" role="alert">Your visit reminder could not be loaded: {state.error}</div>;
+  return (
+    <div className="visit-reminder" role="status" aria-live="polite">
+      <span className="visit-reminder-icon" aria-hidden="true">!</span>
+      <div><strong>Your visit is tomorrow</strong><p>Visit {state.visit.visitNo} is scheduled for {formatDate(state.visit.visitDate)}. Please plan to see your care provider.</p></div>
+      <Link to={`/mothers/${state.visit.motherId}`} className="visit-reminder-link">View care plan <span aria-hidden="true">→</span></Link>
+    </div>
   );
 }
 
@@ -400,6 +415,11 @@ function ErrorBanner({ children }) { return <div className="error-banner" role="
 function LoadingState({ text }) { return <div className="state-card"><span className="spinner" /><p>{text}</p></div>; }
 function ErrorState({ message, retry }) { return <div className="state-card state-error"><span className="state-symbol">!</span><h3>Something went wrong</h3><p>{message}</p><button className="button button-outline" onClick={retry}>Try again</button></div>; }
 function EmptyState({ title, body }) { return <div className="state-card"><span className="empty-symbol">✳</span><h3>{title}</h3><p>{body}</p></div>; }
+function startOfUtcDay(value) {
+  const date = new Date(value);
+  date.setUTCHours(0, 0, 0, 0);
+  return date;
+}
 function formatDate(value) {
   return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(value));
 }
