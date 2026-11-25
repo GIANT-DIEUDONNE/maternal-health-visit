@@ -640,6 +640,8 @@ h1, h2, h3 { font-family: Manrope, sans-serif; letter-spacing: -1px; }
 .login-card .forgot-password-link a { color: #7115b0; }
 .login-card .auth-switch { margin-top: 16px; font-size: 12px; }
 .login-card .auth-switch a { color: #7115b0; }
+.turnstile-container { display: grid; justify-items: center; gap: 7px; min-height: 65px; }
+.turnstile-unavailable { margin: 0; color: #9c3d3d; font-size: 11px; line-height: 1.4; text-align: center; }
 .signup-hero { grid-template-columns: minmax(0, 1.05fr) minmax(420px, .85fr); }
 .signup-card { width: min(100%, 500px); padding: 27px 30px 23px; }
 .signup-kicker { margin-bottom: 8px; color: #7717b2; font-size: 9px; font-weight: 800; letter-spacing: 1.35px; }

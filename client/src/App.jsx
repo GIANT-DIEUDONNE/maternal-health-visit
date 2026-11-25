@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
 import { api } from "./api.js";
 
 const SUPPORT_PHONE = "+250790684556";
 const SUPPORT_EMAIL = "support@maternalhealth.rw";
+const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || "";
 
 function readSession() {
   try {
@@ -248,10 +249,16 @@ function Header({ session, onLogout, visitReminder, dashboard = false }) {
 function AuthPage({ register = false, onAuthenticated }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState("");
+  const [captchaResetSignal, setCaptchaResetSignal] = useState(0);
   const [values, setValues] = useState({ role: "mother", name: "", email: "", password: "", phone: "", dueDate: "", nurseRegistrationCode: "" });
   const submit = async (event) => {
     event.preventDefault();
     setError("");
+    if (!register && !captchaToken) {
+      setError("Please complete the human verification before signing in.");
+      return;
+    }
     setBusy(true);
     try {
       const registration = values.role === "nurse"
@@ -259,11 +266,15 @@ function AuthPage({ register = false, onAuthenticated }) {
         : { role: values.role, name: values.name, email: values.email, password: values.password, phone: values.phone, dueDate: values.dueDate };
       const { token, user } = await api(`/auth/${register ? "register" : "login"}`, {
         method: "POST",
-        body: JSON.stringify(register ? registration : { email: values.email, password: values.password })
+        body: JSON.stringify(register ? registration : { email: values.email, password: values.password, turnstileToken: captchaToken })
       });
       onAuthenticated({ token, user });
     } catch (reason) {
       setError(reason.message);
+      if (!register) {
+        setCaptchaToken("");
+        setCaptchaResetSignal((current) => current + 1);
+      }
     } finally {
       setBusy(false);
     }
@@ -279,11 +290,14 @@ function AuthPage({ register = false, onAuthenticated }) {
         {register && <label className="field"><span>Account role</span><select value={values.role} onChange={(event) => setValues({ ...values, role: event.target.value })}><option value="mother">Mother</option><option value="nurse">Nurse</option></select></label>}
         <Field label="Email address" type="email" autoComplete="email" value={values.email} onChange={(email) => setValues({ ...values, email })} required />
         <Field label="Password" type="password" autoComplete={register ? "new-password" : "current-password"} value={values.password} onChange={(password) => setValues({ ...values, password })} minLength="8" required />
+        {!register && (TURNSTILE_SITE_KEY
+          ? <TurnstileWidget siteKey={TURNSTILE_SITE_KEY} resetSignal={captchaResetSignal} onToken={setCaptchaToken} />
+          : <p className="turnstile-unavailable" role="status">Human verification is not configured yet. Please contact support.</p>)}
         {register && <Field label="Phone number (include country code)" type="tel" placeholder="+1234567890" value={values.phone} onChange={(phone) => setValues({ ...values, phone })} required />}
         {register && values.role === "mother" && <Field label="Expected due date" type="date" value={values.dueDate} onChange={(dueDate) => setValues({ ...values, dueDate })} required />}
         {register && values.role === "nurse" && <Field label="Nurse invite code" type="password" value={values.nurseRegistrationCode} onChange={(nurseRegistrationCode) => setValues({ ...values, nurseRegistrationCode })} required />}
         {error && <ErrorBanner>{error}</ErrorBanner>}
-        <button className="button button-primary full-width" disabled={busy}>{busy ? "Please wait..." : register ? "Create account" : "Sign in"} <span>→</span></button>
+        <button className="button button-primary full-width" disabled={busy || (!register && (!TURNSTILE_SITE_KEY || !captchaToken))}>{busy ? "Please wait..." : register ? "Create account" : "Sign in"} <span>→</span></button>
       </form>
       {!register && <p className="forgot-password-link"><Link to="/forgot-password">Forgot your password?</Link></p>}
       <p className="auth-switch">{register ? "Already have an account?" : "New to Bloom?"} <Link to={register ? "/login" : "/register"}>{register ? "Sign in" : "Create an account"}</Link></p>
@@ -336,6 +350,68 @@ function AuthPage({ register = false, onAuthenticated }) {
       {register && <ContactStrip />}
     </div>
   );
+}
+
+function TurnstileWidget({ siteKey, resetSignal, onToken }) {
+  const containerRef = useRef(null);
+  const widgetIdRef = useRef(null);
+  const tokenCallbackRef = useRef(onToken);
+  const [loadError, setLoadError] = useState("");
+  tokenCallbackRef.current = onToken;
+
+  useEffect(() => {
+    let active = true;
+    let script = document.getElementById("cloudflare-turnstile-script");
+    const renderWidget = () => {
+      if (!active || !containerRef.current || !window.turnstile || widgetIdRef.current !== null) return;
+      try {
+        widgetIdRef.current = window.turnstile.render(containerRef.current, {
+          sitekey: siteKey,
+          callback: (token) => tokenCallbackRef.current(token),
+          "expired-callback": () => tokenCallbackRef.current(""),
+          "error-callback": () => tokenCallbackRef.current("")
+        });
+      } catch {
+        setLoadError("Human verification could not be loaded. Refresh the page and try again.");
+      }
+    };
+    const failToLoad = () => {
+      if (active) setLoadError("Human verification could not be loaded. Check your connection and refresh the page.");
+    };
+
+    if (window.turnstile) {
+      renderWidget();
+    } else {
+      if (!script) {
+        script = document.createElement("script");
+        script.id = "cloudflare-turnstile-script";
+        script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+        script.async = true;
+        script.defer = true;
+        document.head.appendChild(script);
+      }
+      script.addEventListener("load", renderWidget);
+      script.addEventListener("error", failToLoad);
+    }
+
+    return () => {
+      active = false;
+      script?.removeEventListener("load", renderWidget);
+      script?.removeEventListener("error", failToLoad);
+      if (widgetIdRef.current !== null && window.turnstile) {
+        window.turnstile.remove(widgetIdRef.current);
+        widgetIdRef.current = null;
+      }
+    };
+  }, [siteKey]);
+
+  useEffect(() => {
+    if (resetSignal > 0 && widgetIdRef.current !== null && window.turnstile) {
+      window.turnstile.reset(widgetIdRef.current);
+    }
+  }, [resetSignal]);
+
+  return <div className="turnstile-container"><div ref={containerRef} />{loadError && <p className="turnstile-unavailable" role="alert">{loadError}</p>}</div>;
 }
 
 function ForgotPasswordPage() {
