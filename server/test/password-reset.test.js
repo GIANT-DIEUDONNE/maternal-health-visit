@@ -25,6 +25,7 @@ function createTestUser() {
   return {
     id: "507f1f77bcf86cd799439011",
     email,
+    name: "Test Mother",
     phone,
     role: "mother",
     passwordHash: "old-password-hash",
@@ -32,6 +33,21 @@ function createTestUser() {
     save: async function () { this.saved = true; }
   };
 }
+
+test("login succeeds with email and password without human verification", async (t) => {
+  const user = createTestUser();
+  t.mock.method(User, "findOne", async () => user);
+  t.mock.method(bcrypt, "compare", async () => true);
+
+  const response = await request(createTestApp()).post("/api/auth/login").send({
+    email,
+    password: "password123"
+  });
+
+  assert.equal(response.status, 200);
+  assert.ok(response.body.token);
+  assert.equal(response.body.user.email, email);
+});
 
 test("SMS verification code updates the password and invalidates existing tokens", async (t) => {
   const user = createTestUser();

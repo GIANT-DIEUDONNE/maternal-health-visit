@@ -16,8 +16,7 @@ const registerSchema = z.object({
 
 const loginSchema = z.object({
   email: z.string().trim().email(),
-  password: z.string().min(1),
-  turnstileToken: z.string().min(1).max(2048)
+  password: z.string().min(1)
 });
 const passwordResetRequestSchema = z.object({
   email: z.string().trim().email().max(254),
@@ -29,26 +28,6 @@ const passwordResetSchema = passwordResetRequestSchema.extend({
 });
 
 class SmsGatewayError extends Error {}
-class TurnstileGatewayError extends Error {}
-
-async function verifyTurnstileToken(token, secret, expectedHostname) {
-  let response;
-  try {
-    response = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ secret, response: token })
-    });
-    if (!response.ok) throw new TurnstileGatewayError();
-    const result = await response.json();
-    return result.success === true &&
-      typeof result.hostname === "string" &&
-      result.hostname.toLowerCase() === expectedHostname.toLowerCase();
-  } catch (error) {
-    if (error instanceof TurnstileGatewayError) throw error;
-    throw new TurnstileGatewayError();
-  }
-}
 
 function isTwilioConfigured() {
   return Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_VERIFY_SERVICE_SID);
@@ -166,25 +145,14 @@ export function createAuthRouter(express, bcrypt) {
 
   router.post("/login", async (req, res, next) => {
     const input = loginSchema.safeParse(req.body);
-    if (!input.success) return res.status(400).json({ error: "Email, password, and human verification are required." });
-    const { TURNSTILE_SECRET_KEY: turnstileSecret, TURNSTILE_EXPECTED_HOSTNAME: expectedHostname } = process.env;
-    if (!turnstileSecret || !expectedHostname) {
-      return res.status(503).json({ error: "Human verification is not configured. Contact support." });
-    }
+    if (!input.success) return res.status(400).json({ error: "Email and password are required." });
     try {
-      if (!await verifyTurnstileToken(input.data.turnstileToken, turnstileSecret, expectedHostname)) {
-        return res.status(400).json({ error: "Human verification failed. Please try again." });
-      }
       const user = await User.findOne({ email: input.data.email.toLowerCase() });
       if (!user || !(await bcrypt.compare(input.data.password, user.passwordHash))) {
         return res.status(401).json({ error: "Email or password is incorrect." });
       }
       res.json({ token: issueToken(user), user: { id: user.id, name: user.name, email: user.email, role: user.role } });
     } catch (error) {
-      if (error instanceof TurnstileGatewayError) {
-        console.error("Cloudflare Turnstile verification request failed.");
-        return res.status(502).json({ error: "Human verification is temporarily unavailable. Please try again." });
-      }
       next(error);
     }
   });
