@@ -171,6 +171,22 @@ export function createApp() {
     }
   });
 
+  app.patch("/api/visits/:id", requireAuth, requireRole("nurse"), async (req, res, next) => {
+    if (!isValidId(req.params.id)) return res.status(404).json({ error: "Visit not found." });
+    const input = z.object({ notes: z.string().trim().max(2000) }).strict().safeParse(req.body);
+    if (!input.success) return res.status(400).json({ error: "Clinical notes must be 2000 characters or fewer." });
+    try {
+      const visit = await Visit.findById(req.params.id);
+      if (!visit) return res.status(404).json({ error: "Visit not found." });
+      if (!visit.completedAt) return res.status(400).json({ error: "Log the visit before adding clinical notes." });
+      visit.notes = input.data.notes;
+      await visit.save();
+      res.json(serializedVisit(visit, new Date()));
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.get("/api/analytics/missed-visits", requireAuth, requireRole("nurse"), async (_req, res, next) => {
     try {
       const now = new Date();

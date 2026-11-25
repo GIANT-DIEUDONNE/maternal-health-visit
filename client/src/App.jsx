@@ -64,7 +64,7 @@ function App() {
         <Route path="/messages" element={<Protected session={session}><MessagesPage session={session} visitReminder={visitReminder} onLogout={logout} /></Protected>} />
         <Route path="/health-records" element={<Protected session={session}><HealthRecordsPage session={session} visitReminder={visitReminder} onLogout={logout} /></Protected>} />
         <Route path="/mothers/new" element={<Protected session={session} role="nurse"><MotherForm session={session} /></Protected>} />
-        <Route path="/mothers/:id" element={<Protected session={session}><MotherDetail session={session} onLogout={logout} /></Protected>} />
+        <Route path="/mothers/:id" element={<Protected session={session}><MotherDetail session={session} visitReminder={visitReminder} onLogout={logout} /></Protected>} />
         <Route path="*" element={<Navigate to={session ? "/dashboard" : "/"} replace />} />
       </Routes>
     </div>
@@ -848,7 +848,7 @@ function MotherForm({ session }) {
   return <main className="form-page"><Link to="/" className="back-link">← Back to care plans</Link><section className="form-panel"><span className="eyebrow">NEW CARE PLAN</span><h1>Add a mother</h1><p>We’ll create a personalized schedule of five visits based on her due date.</p><form onSubmit={submit} className="form-stack"><Field label="Full name" value={values.name} onChange={(name) => setValues({ ...values, name })} required /><Field label="Phone number" type="tel" value={values.phone} onChange={(phone) => setValues({ ...values, phone })} required /><Field label="Expected due date" type="date" value={values.dueDate} onChange={(dueDate) => setValues({ ...values, dueDate })} required />{error && <ErrorBanner>{error}</ErrorBanner>}<button className="button button-primary" disabled={busy}>{busy ? "Creating..." : "Create care plan"} <span>→</span></button></form></section></main>;
 }
 
-function MotherDetail({ session, onLogout }) {
+function MotherDetail({ session, visitReminder, onLogout }) {
   const { id } = useParams();
   const [state, setState] = useState({ loading: true, error: "", mother: null });
   const [actionError, setActionError] = useState("");
@@ -885,6 +885,20 @@ function MotherDetail({ session, onLogout }) {
       setBusyVisit(null);
     }
   };
+  const saveVisitNote = async (visitId, notes) => {
+    const updatedVisit = await api(`/visits/${visitId}`, {
+      token: session.token,
+      method: "PATCH",
+      body: JSON.stringify({ notes })
+    });
+    setState((current) => current.mother ? {
+      ...current,
+      mother: {
+        ...current.mother,
+        visits: current.mother.visits.map((visit) => visit._id === visitId ? updatedVisit : visit)
+      }
+    } : current);
+  };
 
   const mother = state.mother;
   const visits = mother?.visits || [];
@@ -895,7 +909,7 @@ function MotherDetail({ session, onLogout }) {
     <div className={`dashboard-layout dashboard-role-${session.user.role}`}>
       <DashboardSidebar session={session} activePage="dashboard" missedCount={0} onLogout={onLogout} />
       <div className="dashboard-main">
-        <Header session={session} onLogout={onLogout} dashboard />
+        <Header session={session} onLogout={onLogout} visitReminder={visitReminder} dashboard />
         <div className="dashboard-workspace">
           <main className="page-wrap dashboard-page detail-page dashboard-care-plan">
             {state.loading ? <LoadingState text="Loading care plan..." /> : state.error || !mother ? (
@@ -923,7 +937,7 @@ function MotherDetail({ session, onLogout }) {
               </div>
               {actionError && <ErrorBanner>{actionError}</ErrorBanner>}
               <section className="visit-list">
-                {visits.map((visit) => <VisitRow key={visit._id} visit={visit} canLog={session.user.role === "nurse"} loading={busyVisit === visit.visitNo} onLog={() => logVisit(visit.visitNo)} />)}
+                {visits.map((visit) => <VisitRow key={visit._id} visit={visit} canLog={session.user.role === "nurse"} loading={busyVisit === visit.visitNo} onLog={() => logVisit(visit.visitNo)} onSaveNote={(notes) => saveVisitNote(visit._id, notes)} />)}
               </section>
             </>}
           </main>
@@ -941,15 +955,40 @@ function ProgressRing({ completed }) {
   return <svg className="progress-ring" viewBox="0 0 110 110" aria-label={`${completed} of 5 visits complete`}><circle className="ring-track" cx="55" cy="55" r={radius} /><circle className="ring-value" cx="55" cy="55" r={radius} strokeDasharray={circumference} strokeDashoffset={offset} transform="rotate(-90 55 55)" /></svg>;
 }
 
-function VisitRow({ visit, canLog, loading, onLog }) {
+function VisitRow({ visit, canLog, loading, onLog, onSaveNote }) {
+  const [editingNote, setEditingNote] = useState(false);
+  const [draftNote, setDraftNote] = useState(visit.notes || "");
+  const [savingNote, setSavingNote] = useState(false);
+  const [noteError, setNoteError] = useState("");
   const status = visit.completedAt ? "complete" : visit.missed ? "missed" : "upcoming";
+  const saveNote = async () => {
+    setSavingNote(true);
+    setNoteError("");
+    try {
+      await onSaveNote(draftNote);
+      setEditingNote(false);
+    } catch (error) {
+      setNoteError(error.message);
+    } finally {
+      setSavingNote(false);
+    }
+  };
   return (
-    <div className={`visit-row ${status}`}>
-      <div className={`visit-check ${visit.completedAt ? "checked" : ""}`}>{visit.completedAt ? "✓" : String(visit.visitNo).padStart(2, "0")}</div>
-      <div className="visit-info"><strong>Visit {visit.visitNo}</strong><span>{visit.completedAt ? `Logged ${formatDate(visit.completedAt)}` : `Scheduled ${formatDate(visit.visitDate)}`}</span></div>
-      <span className={`status-pill status-${status}`}>{status === "complete" ? "Completed" : status === "missed" ? "Missed" : "Upcoming"}</span>
-      {canLog && !visit.completedAt && <button className="button button-outline button-small" disabled={loading} onClick={onLog}>{loading ? "Saving..." : "Log visit"}</button>}
-    </div>
+    <article className={`visit-history-item ${status}`}>
+      <div className="visit-row">
+        <div className={`visit-check ${visit.completedAt ? "checked" : ""}`}>{visit.completedAt ? "✓" : String(visit.visitNo).padStart(2, "0")}</div>
+        <div className="visit-info"><strong>Visit {visit.visitNo}</strong><span>{visit.completedAt ? `Logged ${formatDate(visit.completedAt)}` : `Scheduled ${formatDate(visit.visitDate)}`}</span></div>
+        <span className={`status-pill status-${status}`}>{status === "complete" ? "Completed" : status === "missed" ? "Missed" : "Upcoming"}</span>
+        {canLog && !visit.completedAt && <button className="button button-outline button-small" disabled={loading} onClick={onLog}>{loading ? "Saving..." : "Log visit"}</button>}
+        {canLog && visit.completedAt && <button className="button button-outline button-small note-toggle" type="button" onClick={() => { setDraftNote(visit.notes || ""); setEditingNote((editing) => !editing); setNoteError(""); }}>{editingNote ? "Cancel note" : visit.notes ? "Edit note" : "Add note"}</button>}
+      </div>
+      {visit.notes && !editingNote && <div className="visit-clinical-note"><strong>Clinical note</strong><p>{visit.notes}</p></div>}
+      {canLog && visit.completedAt && editingNote && <div className="visit-note-editor">
+        <label><span>Clinical note</span><textarea rows="3" maxLength="2000" value={draftNote} onChange={(event) => setDraftNote(event.target.value)} placeholder="Add notes from this visit..." /></label>
+        {noteError && <ErrorBanner>{noteError}</ErrorBanner>}
+        <button className="button button-primary button-small" type="button" disabled={savingNote} onClick={saveNote}>{savingNote ? "Saving..." : "Save note"}</button>
+      </div>}
+    </article>
   );
 }
 

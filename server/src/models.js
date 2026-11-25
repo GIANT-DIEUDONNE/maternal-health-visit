@@ -28,7 +28,8 @@ const visitSchema = new mongoose.Schema(
     motherId: { type: mongoose.Schema.Types.ObjectId, ref: "Mother", required: true, index: true },
     visitNo: { type: Number, required: true, min: 1, max: 5 },
     visitDate: { type: Date, required: true },
-    completedAt: { type: Date, default: null }
+    completedAt: { type: Date, default: null },
+    notes: { type: String, trim: true, maxlength: 2000, default: "" }
   },
   { timestamps: true }
 );

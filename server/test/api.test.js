@@ -92,6 +92,53 @@ test("nurse can successfully log the first scheduled visit", async () => {
   assert.equal(response.body.missed, false);
 });
 
+test("mother can view her visit history and clinical notes", async () => {
+  const visit = await Visit.findOne({ motherId: mother.id, visitNo: 1 });
+  visit.completedAt = new Date();
+  visit.notes = "Initial antenatal check completed.";
+  await visit.save();
+
+  const response = await request(app).get(`/api/mothers/${mother.id}`)
+    .set("Authorization", `Bearer ${motherToken}`);
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body.visits.length, 5);
+  assert.equal(response.body.visits[0].notes, "Initial antenatal check completed.");
+  assert.ok(response.body.visits[0].completedAt);
+});
+
+test("nurse can add notes to completed visits, but mothers cannot edit them", async () => {
+  const visit = await Visit.findOne({ motherId: mother.id, visitNo: 1 });
+  visit.completedAt = new Date();
+  await visit.save();
+
+  const saved = await request(app).patch(`/api/visits/${visit.id}`)
+    .set("Authorization", `Bearer ${nurseToken}`)
+    .send({ notes: "Follow-up plan discussed." });
+  assert.equal(saved.status, 200);
+  assert.equal(saved.body.notes, "Follow-up plan discussed.");
+
+  const denied = await request(app).patch(`/api/visits/${visit.id}`)
+    .set("Authorization", `Bearer ${motherToken}`)
+    .send({ notes: "Changed by mother." });
+  assert.equal(denied.status, 403);
+  assert.equal((await Visit.findById(visit.id)).notes, "Follow-up plan discussed.");
+});
+
+test("clinical notes require a completed visit and enforce a length limit", async () => {
+  const visit = await Visit.findOne({ motherId: mother.id, visitNo: 1 });
+
+  const uncompleted = await request(app).patch(`/api/visits/${visit.id}`)
+    .set("Authorization", `Bearer ${nurseToken}`)
+    .send({ notes: "Not yet completed." });
+  assert.equal(uncompleted.status, 400);
+
+  const tooLong = await request(app).patch(`/api/visits/${visit.id}`)
+    .set("Authorization", `Bearer ${nurseToken}`)
+    .send({ notes: "x".repeat(2001) });
+  assert.equal(tooLong.status, 400);
+});
+
 test("nurse-created mother receives five due-date-based visits", async () => {
   const dueDate = new Date(Date.now() + 260 * 86400000);
   const response = await request(app).post("/api/mothers").set("Authorization", `Bearer ${nurseToken}`)

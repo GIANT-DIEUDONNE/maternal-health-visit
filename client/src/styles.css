@@ -736,7 +736,9 @@ h1, h2, h3 { font-family: Manrope, sans-serif; letter-spacing: -1px; }
 .dashboard-care-plan .visit-heading { margin: 18px 0 11px; }
 .dashboard-care-plan .dashboard-section-icon { font-size: 27px; }
 .dashboard-care-plan .visit-list { border-color: #e7d6fa; border-radius: 17px; box-shadow: 0 5px 16px #54108e0d; }
-.dashboard-care-plan .visit-row { min-height: 47px; gap: 14px; padding: 6px 16px; border-color: #f0e5f8; }
+.dashboard-care-plan .visit-history-item { border-bottom: 1px solid #f0e5f8; }
+.dashboard-care-plan .visit-history-item:last-child { border-bottom: 0; }
+.dashboard-care-plan .visit-row { min-height: 47px; gap: 14px; padding: 6px 16px; border: 0; }
 .dashboard-care-plan .visit-check { width: 31px; height: 31px; flex-basis: 31px; border-color: #e8d9f5; color: #4d1f78; background: #f5e9ff; }
 .dashboard-care-plan .visit-check.checked { border-color: #b7ead7; color: #087958; background: #d9f4e9; }
 .dashboard-care-plan .visit-info strong { margin-bottom: 2px; color: #321453; font-size: 12px; }
@@ -746,6 +748,14 @@ h1, h2, h3 { font-family: Manrope, sans-serif; letter-spacing: -1px; }
 .dashboard-care-plan .status-upcoming { color: #704099; background: #f2e8fc; }
 .dashboard-care-plan .status-complete { color: #087958; background: #d9f4e9; }
 .dashboard-care-plan .visit-row .button-outline { min-width: 98px; min-height: 32px; border-color: #a64ce4; border-radius: 20px; color: #6b1db0; }
+.dashboard-care-plan .visit-clinical-note { margin: 0 16px 10px 61px; padding: 10px 12px; border-left: 3px solid #a550df; border-radius: 0 8px 8px 0; background: #f8f0ff; color: #43245f; font-size: 11px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.dashboard-care-plan .visit-clinical-note strong { color: #6822a1; font-size: 10px; }
+.dashboard-care-plan .visit-clinical-note p { margin: 3px 0 0; }
+.dashboard-care-plan .visit-note-editor { display: grid; justify-items: start; gap: 8px; margin: 0 16px 12px 61px; }
+.dashboard-care-plan .visit-note-editor label { width: 100%; display: grid; gap: 5px; color: #542578; font-size: 10px; font-weight: 700; }
+.dashboard-care-plan .visit-note-editor textarea { width: 100%; resize: vertical; padding: 9px 10px; border: 1px solid #d9c2ed; border-radius: 8px; color: #332244; background: #fff; font: 12px/1.5 "DM Sans", sans-serif; }
+.dashboard-care-plan .visit-note-editor textarea:focus { outline: 3px solid #9a55d933; border-color: #9a55d9; }
+.dashboard-care-plan .visit-note-editor .error-banner { width: 100%; }
 .dashboard-care-plan > .error-banner { margin: 12px 0; }
 
 @media (max-width: 620px) {
@@ -765,4 +775,5 @@ h1, h2, h3 { font-family: Manrope, sans-serif; letter-spacing: -1px; }
   .dashboard-care-plan .visit-info span { font-size: 8px; }
   .dashboard-care-plan .status-pill { min-width: 0; padding: 5px 6px; font-size: 7px; }
   .dashboard-care-plan .visit-row .button-outline { grid-column: 2 / 4; justify-self: end; min-height: 28px; }
+  .dashboard-care-plan .visit-clinical-note, .dashboard-care-plan .visit-note-editor { margin-left: 47px; margin-right: 9px; }
 }

@@ -31,6 +31,7 @@ All routes except `/api/auth/register`, `/api/auth/login`, `/api/auth/forgot-pas
 - `GET /api/mothers/:id`, `PATCH /api/mothers/:id`, `DELETE /api/mothers/:id`
 - `GET /api/visits?page=1&limit=10` — paginated schedule for the authorized user
 - `POST /api/visits` with `{ "motherId": "...", "visitNo": 1 }` — nurse logs a scheduled visit
+- `PATCH /api/visits/:id` with `{ "notes": "..." }` — nurses add or update a note on a completed visit (up to 2000 characters); the mother can read notes on her own care-plan history
 - `GET /api/analytics/missed-visits` — nurse-only missed-visit summary
 
 Bad input and invalid visit order return `400`; missing records return `404`; unauthenticated requests return `401`; role failures return `403`.
