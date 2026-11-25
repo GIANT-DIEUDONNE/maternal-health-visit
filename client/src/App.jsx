@@ -424,6 +424,8 @@ function Dashboard({ session, visitReminder, onLogout }) {
   const [page, setPage] = useState(1);
   const [missed, setMissed] = useState([]);
   const [analyticsError, setAnalyticsError] = useState("");
+  const [deletingMotherId, setDeletingMotherId] = useState(null);
+  const [deleteError, setDeleteError] = useState("");
   const [greeting, setGreeting] = useState(getKigaliGreeting);
   useEffect(() => {
     const updateGreeting = () => setGreeting(getKigaliGreeting());
@@ -450,6 +452,23 @@ function Dashboard({ session, visitReminder, onLogout }) {
     }
   }, [page, session.token, session.user.role]);
   useEffect(() => { load(); }, [load]);
+  const removeMother = async (mother) => {
+    if (!window.confirm(`Remove ${mother.name} and all of her scheduled visits? This cannot be undone.`)) return;
+    setDeletingMotherId(mother._id);
+    setDeleteError("");
+    try {
+      await api(`/mothers/${mother._id}`, { token: session.token, method: "DELETE" });
+      if (result.data.length === 1 && page > 1) {
+        setResult((current) => ({ ...current, loading: true, error: "" }));
+        setPage(page - 1);
+      }
+      else await load();
+    } catch (error) {
+      setDeleteError(error.message);
+    } finally {
+      setDeletingMotherId(null);
+    }
+  };
   const missedCount = missed.reduce((sum, item) => sum + item.missedVisits.length, 0);
   const motherVisits = visitReminder.visits || [];
   const completedVisits = motherVisits.filter((visit) => visit.completedAt).length;
@@ -476,7 +495,7 @@ function Dashboard({ session, visitReminder, onLogout }) {
               </> : <>
                 <SummaryCard label="VISITS COMPLETED" value={visitReminder.loading ? "—" : `${completedVisits}/${motherVisits.length || 5}`} caption="Your care journey progress" icon="✓" />
                 <SummaryCard id="appointments" label="NEXT APPOINTMENT" value={nextVisit ? formatDate(nextVisit.visitDate) : "—"} caption={nextVisit ? `Visit ${nextVisit.visitNo} on your care plan` : "No visits remaining"} icon="▦" tone="peach" />
-                <SummaryCard label="EXPECTED DUE DATE" value={result.data[0] ? formatDate(result.data[0].dueDate) : "—"} caption="Your pregnancy milestone" icon="♡" tone="pink" />
+                <SummaryCard to={result.data[0] ? `/mothers/${result.data[0]._id}` : undefined} label="EXPECTED DUE DATE" value={result.data[0] ? formatDate(result.data[0].dueDate) : "—"} caption="Open your care plan" icon="♡" tone="pink" />
               </>}
             </div>
             {session.user.role === "nurse" && missed.length > 0 && <div className="notice dashboard-follow-up"><span aria-hidden="true">♟</span><p><strong>{missed.length} {missed.length === 1 ? "mother has" : "mothers have"} visits to follow up.</strong> Review their care plans below.</p><a href="#care-plans" aria-label="Review care plans">›</a></div>}
@@ -484,9 +503,10 @@ function Dashboard({ session, visitReminder, onLogout }) {
               <div className="dashboard-section-title"><span className="dashboard-section-icon" aria-hidden="true">♟</span><div><h2>{session.user.role === "nurse" ? "Mother care plans" : "My care plan"}</h2><p>{session.user.role === "nurse" ? "A clear view of each journey and next step." : "Your visits, thoughtfully planned around your due date."}</p></div></div>
               <span className="results-count">{result.pagination?.total ?? 0} {result.pagination?.total === 1 ? "profile" : "profiles"}</span>
             </div>
+            {deleteError && <ErrorBanner>{deleteError}</ErrorBanner>}
             {result.loading ? <LoadingState text="Loading care plans..." /> : result.error ? <ErrorState message={result.error} retry={load} /> : result.data.length === 0 ? <EmptyState title="No care plans yet" body={session.user.role === "nurse" ? "Add a mother to start tracking her visits." : "Your care plan will appear here."} /> : (
               <div className="mother-grid">
-                {result.data.map((mother) => <MotherCard key={mother._id} mother={mother} token={session.token} />)}
+                {result.data.map((mother) => <MotherCard key={mother._id} mother={mother} token={session.token} onRemove={session.user.role === "nurse" ? removeMother : undefined} removing={deletingMotherId === mother._id} removalDisabled={Boolean(deletingMotherId)} />)}
               </div>
             )}
             {!result.loading && result.pagination?.pages > 1 && <div className="pagination dashboard-pagination"><button className="button button-outline" disabled={page === 1} onClick={() => setPage(page - 1)}>← Previous</button><span>Page {page} of {result.pagination.pages}</span><button className="button button-outline" disabled={page === result.pagination.pages} onClick={() => setPage(page + 1)}>Next →</button></div>}
@@ -770,32 +790,40 @@ function VisitReminder({ state }) {
   );
 }
 
-function SummaryCard({ label, value, caption, icon, tone = "", id }) {
-  return <div className="summary-card" id={id}><div className="summary-top"><span>{label}</span><span className={`summary-icon ${tone}`}>{icon}</span></div><strong>{value}</strong><small>{caption}</small></div>;
+function SummaryCard({ label, value, caption, icon, tone = "", id, to }) {
+  const contents = <><div className="summary-top"><span>{label}</span><span className={`summary-icon ${tone}`} aria-hidden="true">{icon}</span></div><strong>{value}</strong><small>{caption}</small></>;
+  return to
+    ? <Link className="summary-card summary-card-link" id={id} to={to} aria-label={`${label}: ${value}. ${caption}`}>{contents}</Link>
+    : <div className="summary-card" id={id}>{contents}</div>;
 }
 
-function MotherCard({ mother }) {
+function MotherCard({ mother, token, onRemove, removing = false, removalDisabled = false }) {
   const [visits, setVisits] = useState(null);
   const [error, setError] = useState("");
   useEffect(() => {
     let active = true;
-    api(`/mothers/${mother._id}`, { token: readSession()?.token })
+    api(`/mothers/${mother._id}`, { token: token || readSession()?.token })
       .then((detail) => { if (active) setVisits(detail.visits); })
       .catch((reason) => { if (active) setError(reason.message); });
     return () => { active = false; };
-  }, [mother._id]);
+  }, [mother._id, token]);
   const completed = visits?.filter((visit) => visit.completedAt).length || 0;
   return (
-    <Link to={`/mothers/${mother._id}`} className="mother-card">
-      <div className="mother-card-main">
-        <div className="avatar">{mother.name.split(" ").map((part) => part[0]).slice(0, 2).join("")}</div>
-        <div className="mother-card-info"><h3>{mother.name}</h3><span className="due-label">EXPECTED DUE DATE</span><p className="due-date">{formatDate(mother.dueDate)}</p></div>
-        <span className="card-arrow" aria-hidden="true">↗</span>
-      </div>
-      <div className="mother-card-bottom">
-        {error ? <span className="muted small">Progress unavailable</span> : visits ? <><div className="progress-track"><span style={{ width: `${completed / 5 * 100}%` }} /></div><span>{completed}/5 visits</span></> : <span className="muted small">Loading progress…</span>}
-      </div>
-    </Link>
+    <article className="mother-card">
+      <Link to={`/mothers/${mother._id}`} className="mother-card-link" aria-label={`Open ${mother.name}'s care plan`}>
+        <div className="mother-card-main">
+          <div className="avatar">{mother.name.split(" ").map((part) => part[0]).slice(0, 2).join("")}</div>
+          <div className="mother-card-info"><h3>{mother.name}</h3><span className="due-label">EXPECTED DUE DATE</span><p className="due-date">{formatDate(mother.dueDate)}</p></div>
+          <span className="card-arrow" aria-hidden="true">↗</span>
+        </div>
+        <div className="mother-card-bottom">
+          {error ? <span className="muted small">Progress unavailable</span> : visits ? <><div className="progress-track"><span style={{ width: `${completed / 5 * 100}%` }} /></div><span>{completed}/5 visits</span></> : <span className="muted small">Loading progress…</span>}
+        </div>
+      </Link>
+      {onRemove && <button className="button button-outline button-small mother-remove-button" type="button" disabled={removalDisabled} onClick={() => onRemove(mother)} aria-label={`Remove ${mother.name} and her care plan`}>
+        {removing ? "Removing..." : "Remove mother"}
+      </button>}
+    </article>
   );
 }
 
