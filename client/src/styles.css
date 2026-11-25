@@ -695,3 +695,67 @@ h1, h2, h3 { font-family: Manrope, sans-serif; letter-spacing: -1px; }
   .login-footer-message { font-size: 11px; }
   .login-footer-contact { font-size: 10px; }
 }
+
+.dashboard-care-plan { padding-top: 24px; }
+.dashboard-care-plan > .back-link { margin: 0 0 10px; color: #54198a; }
+.care-plan-heading { margin-bottom: 19px; }
+.care-plan-heading h1 { margin: 0 0 4px; font-size: clamp(27px, 3vw, 36px); }
+.care-plan-heading p { margin: 0; }
+.dashboard-care-plan .profile-hero { padding: 15px 20px; border-color: #e7d6fa; border-radius: 17px; background: #ffffffed; box-shadow: 0 7px 20px #54108e16; }
+.dashboard-care-plan .profile-identity { gap: 14px; }
+.dashboard-care-plan .avatar-large { width: 68px; height: 68px; flex-basis: 68px; border-radius: 50%; color: #fff; background: linear-gradient(140deg, #a43ee7, #6610b8); font-size: 18px; }
+.dashboard-care-plan .profile-identity .eyebrow { color: #8126c6; font-size: 10px; letter-spacing: .3px; }
+.dashboard-care-plan .profile-identity h2 { margin: 5px 0 2px; color: #29134e; font-size: 21px; letter-spacing: -.7px; }
+.care-plan-phone { display: inline-flex; align-items: center; gap: 7px; color: #7625bd; font-size: 12px; font-weight: 600; }
+.due-panel { color: #2b164e; }
+.dashboard-care-plan .due-panel { min-width: 220px; padding-left: 24px; border-color: #eadcf6; }
+.dashboard-care-plan .due-panel span { color: #7926bd; font-size: 10px; letter-spacing: .2px; }
+.dashboard-care-plan .due-panel strong { margin: 5px 0 3px; color: #2a174c; font-size: 20px; }
+.dashboard-care-plan .due-panel small { color: #795b95; }
+.dashboard-care-plan .progress-panel { position: relative; gap: 23px; margin-top: 16px; padding: 14px 22px; border: 1px solid #e8d2ff; border-radius: 19px; background: linear-gradient(105deg, #f1ddff, #f9eaff 65%, #f0dcff); box-shadow: 0 5px 15px #54108e0d; }
+.dashboard-care-plan .progress-ring-wrap { width: 90px; height: 90px; flex-basis: 90px; }
+.dashboard-care-plan .ring-track { stroke: #d7beed; }
+.dashboard-care-plan .ring-value { stroke: #8132d2; }
+.dashboard-care-plan .ring-caption strong { color: #29134e; }
+.dashboard-care-plan .ring-caption span { color: #60427e; }
+.dashboard-care-plan .progress-copy { padding-right: 95px; }
+.dashboard-care-plan .progress-copy .eyebrow { color: #8126c6; }
+.dashboard-care-plan .progress-copy h2 { margin: 4px 0; color: #29134e; font-size: 19px; letter-spacing: -.5px; }
+.dashboard-care-plan .progress-copy p { margin-bottom: 9px; color: #4e3470; font-size: 12px; }
+.dashboard-care-plan .journey-track { height: 6px; background: #d7b8f1; }
+.dashboard-care-plan .journey-track span { background: linear-gradient(90deg, #a33ee7, #5b15bd); }
+.dashboard-care-plan .journey-caption { display: none; }
+.journey-heart { position: absolute; top: 10px; right: 24px; color: #8d2cd3; font: 45px/1 Georgia, serif; }
+.dashboard-care-plan .visit-heading { margin: 18px 0 11px; }
+.dashboard-care-plan .dashboard-section-icon { font-size: 27px; }
+.dashboard-care-plan .visit-list { border-color: #e7d6fa; border-radius: 17px; box-shadow: 0 5px 16px #54108e0d; }
+.dashboard-care-plan .visit-row { min-height: 47px; gap: 14px; padding: 6px 16px; border-color: #f0e5f8; }
+.dashboard-care-plan .visit-check { width: 31px; height: 31px; flex-basis: 31px; border-color: #e8d9f5; color: #4d1f78; background: #f5e9ff; }
+.dashboard-care-plan .visit-check.checked { border-color: #b7ead7; color: #087958; background: #d9f4e9; }
+.dashboard-care-plan .visit-info strong { margin-bottom: 2px; color: #321453; font-size: 12px; }
+.dashboard-care-plan .visit-info span { color: #7848a1; font-size: 10px; }
+.dashboard-care-plan .status-pill { min-width: 86px; text-align: center; }
+.dashboard-care-plan .status-missed { color: #e83c70; background: #ffe0ed; }
+.dashboard-care-plan .status-upcoming { color: #704099; background: #f2e8fc; }
+.dashboard-care-plan .status-complete { color: #087958; background: #d9f4e9; }
+.dashboard-care-plan .visit-row .button-outline { min-width: 98px; min-height: 32px; border-color: #a64ce4; border-radius: 20px; color: #6b1db0; }
+.dashboard-care-plan > .error-banner { margin: 12px 0; }
+
+@media (max-width: 620px) {
+  .dashboard-care-plan { padding-top: 22px; }
+  .dashboard-care-plan .profile-hero { align-items: stretch; gap: 13px; padding: 16px; }
+  .dashboard-care-plan .profile-identity h2 { font-size: 17px; }
+  .dashboard-care-plan .due-panel { min-width: 0; padding: 12px 0 0; border-top: 1px solid #eadcf6; border-left: 0; }
+  .dashboard-care-plan .progress-panel { gap: 12px; padding: 13px; }
+  .dashboard-care-plan .progress-ring-wrap { width: 70px; height: 70px; flex-basis: 70px; }
+  .dashboard-care-plan .progress-copy { padding-right: 0; }
+  .dashboard-care-plan .progress-copy h2 { font-size: 14px; }
+  .dashboard-care-plan .progress-copy p { font-size: 10px; }
+  .journey-heart { display: none; }
+  .dashboard-care-plan .visit-heading .results-count { padding: 7px 8px; font-size: 7px; }
+  .dashboard-care-plan .visit-row { display: grid; grid-template-columns: 31px minmax(0, 1fr) auto; gap: 7px; padding: 9px; }
+  .dashboard-care-plan .visit-info { min-width: 0; }
+  .dashboard-care-plan .visit-info span { font-size: 8px; }
+  .dashboard-care-plan .status-pill { min-width: 0; padding: 5px 6px; font-size: 7px; }
+  .dashboard-care-plan .visit-row .button-outline { grid-column: 2 / 4; justify-self: end; min-height: 28px; }
+}

@@ -31,7 +31,8 @@ function App() {
   const [remindersEnabled, setRemindersEnabled] = useState(() => readReminderPreference(session?.user?.email));
   const location = useLocation();
   const navigate = useNavigate();
-  const dashboardArea = ["/dashboard", "/settings", "/messages", "/health-records"].includes(location.pathname);
+  const dashboardArea = ["/dashboard", "/settings", "/messages", "/health-records"].includes(location.pathname)
+    || (location.pathname.startsWith("/mothers/") && location.pathname !== "/mothers/new");
   const visitReminder = useVisitReminder(session?.token, session?.user?.role === "mother", remindersEnabled);
   const onAuthenticated = (value) => {
     localStorage.setItem("maternal-session", JSON.stringify(value));
@@ -63,7 +64,7 @@ function App() {
         <Route path="/messages" element={<Protected session={session}><MessagesPage session={session} visitReminder={visitReminder} onLogout={logout} /></Protected>} />
         <Route path="/health-records" element={<Protected session={session}><HealthRecordsPage session={session} visitReminder={visitReminder} onLogout={logout} /></Protected>} />
         <Route path="/mothers/new" element={<Protected session={session} role="nurse"><MotherForm session={session} /></Protected>} />
-        <Route path="/mothers/:id" element={<Protected session={session}><MotherDetail session={session} /></Protected>} />
+        <Route path="/mothers/:id" element={<Protected session={session}><MotherDetail session={session} onLogout={logout} /></Protected>} />
         <Route path="*" element={<Navigate to={session ? "/dashboard" : "/"} replace />} />
       </Routes>
     </div>
@@ -819,11 +820,21 @@ function MotherForm({ session }) {
   return <main className="form-page"><Link to="/" className="back-link">← Back to care plans</Link><section className="form-panel"><span className="eyebrow">NEW CARE PLAN</span><h1>Add a mother</h1><p>We’ll create a personalized schedule of five visits based on her due date.</p><form onSubmit={submit} className="form-stack"><Field label="Full name" value={values.name} onChange={(name) => setValues({ ...values, name })} required /><Field label="Phone number" type="tel" value={values.phone} onChange={(phone) => setValues({ ...values, phone })} required /><Field label="Expected due date" type="date" value={values.dueDate} onChange={(dueDate) => setValues({ ...values, dueDate })} required />{error && <ErrorBanner>{error}</ErrorBanner>}<button className="button button-primary" disabled={busy}>{busy ? "Creating..." : "Create care plan"} <span>→</span></button></form></section></main>;
 }
 
-function MotherDetail({ session }) {
+function MotherDetail({ session, onLogout }) {
   const { id } = useParams();
   const [state, setState] = useState({ loading: true, error: "", mother: null });
   const [actionError, setActionError] = useState("");
   const [busyVisit, setBusyVisit] = useState(null);
+  const [greeting, setGreeting] = useState(getKigaliGreeting);
+  useEffect(() => {
+    const updateGreeting = () => setGreeting(getKigaliGreeting());
+    const interval = window.setInterval(updateGreeting, 60_000);
+    document.addEventListener("visibilitychange", updateGreeting);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", updateGreeting);
+    };
+  }, []);
   const load = useCallback(async () => {
     setState({ loading: true, error: "", mother: null });
     try {
@@ -847,29 +858,51 @@ function MotherDetail({ session }) {
     }
   };
 
-  if (state.loading) return <main className="page-wrap"><LoadingState text="Loading care plan..." /></main>;
-  if (state.error || !state.mother) return <main className="page-wrap"><ErrorState message={state.error || "Mother not found."} retry={load} /></main>;
-  const { mother } = state;
-  const visits = mother.visits || [];
+  const mother = state.mother;
+  const visits = mother?.visits || [];
   const completed = visits.filter((visit) => visit.completedAt).length;
   const next = visits.find((visit) => !visit.completedAt);
+  const greetingName = session.user.role === "nurse" ? mother?.name : session.user.name;
   return (
-    <main className="page-wrap detail-page">
-      <Link to="/" className="back-link">← All care plans</Link>
-      <section className="profile-hero">
-        <div className="profile-identity"><div className="avatar avatar-large">{mother.name.split(" ").map((part) => part[0]).slice(0, 2).join("")}</div><div><span className="eyebrow">MATERNAL CARE PLAN</span><h1>{mother.name}</h1><p>{mother.phone}</p></div></div>
-        <div className="due-panel"><span>EXPECTED DUE DATE</span><strong>{formatDate(mother.dueDate)}</strong><small>Care plan personalized for you</small></div>
-      </section>
-      <section className="progress-panel">
-        <div className="progress-ring-wrap"><ProgressRing completed={completed} /><div className="ring-caption"><strong>{completed} of 5</strong><span>visits complete</span></div></div>
-        <div className="progress-copy"><span className="eyebrow">YOUR JOURNEY</span><h2>{completed === 5 ? "All visits complete — wonderful work." : next ? `Visit ${next.visitNo} is your next step.` : "Your care plan is ready."}</h2><p>{completed === 5 ? "Your planned prenatal visits are all logged." : next ? `Your next appointment is planned for ${formatDate(next.visitDate)}.` : "Your planned check-ins will appear below."}</p><div className="journey-track"><span style={{ width: `${completed / 5 * 100}%` }} /></div><span className="journey-caption">{5 - completed} visits remaining</span></div>
-      </section>
-      <div className="section-heading visit-heading"><div><h2>Visit checklist</h2><p>Your schedule is calculated from your expected due date.</p></div><span className="results-count">5 PLANNED VISITS</span></div>
-      {actionError && <ErrorBanner>{actionError}</ErrorBanner>}
-      <section className="visit-list">
-        {visits.map((visit) => <VisitRow key={visit._id} visit={visit} canLog={session.user.role === "nurse"} loading={busyVisit === visit.visitNo} onLog={() => logVisit(visit.visitNo)} />)}
-      </section>
-    </main>
+    <div className={`dashboard-layout dashboard-role-${session.user.role}`}>
+      <DashboardSidebar session={session} activePage="dashboard" missedCount={0} onLogout={onLogout} />
+      <div className="dashboard-main">
+        <Header session={session} onLogout={onLogout} dashboard />
+        <div className="dashboard-workspace">
+          <main className="page-wrap dashboard-page detail-page dashboard-care-plan">
+            {state.loading ? <LoadingState text="Loading care plan..." /> : state.error || !mother ? (
+              <ErrorState message={state.error || "Mother not found."} retry={load} />
+            ) : <>
+              <Link to="/dashboard#care-plans" className="back-link">← All care plans</Link>
+              <div className="page-heading dashboard-heading care-plan-heading">
+                <div><h1>{greeting}, {greetingName.split(" ")[0]}.</h1><p>Here’s your maternal care plan and visit schedule.</p></div>
+              </div>
+              <section className="profile-hero">
+                <div className="profile-identity">
+                  <div className="avatar avatar-large">{mother.name.split(" ").map((part) => part[0]).slice(0, 2).join("")}</div>
+                  <div><span className="eyebrow">MATERNAL CARE PLAN</span><h2>{mother.name}</h2><a href={`tel:${phoneForSms(mother.phone)}`} className="care-plan-phone"><span aria-hidden="true">☎</span>{mother.phone}</a></div>
+                </div>
+                <div className="due-panel"><span>EXPECTED DUE DATE</span><strong>{formatDate(mother.dueDate)}</strong><small>Care plan personalized for you</small></div>
+              </section>
+              <section className="progress-panel">
+                <div className="progress-ring-wrap"><ProgressRing completed={completed} /><div className="ring-caption"><strong>{completed} of 5</strong><span>visits complete</span></div></div>
+                <div className="progress-copy"><span className="eyebrow">YOUR JOURNEY</span><h2>{completed === 5 ? "All visits complete — wonderful work." : next ? `Visit ${next.visitNo} is your next step.` : "Your care plan is ready."}</h2><p>{completed === 5 ? "Your planned prenatal visits are all logged." : next ? `Your next appointment is planned for ${formatDate(next.visitDate)}.` : "Your planned check-ins will appear below."}</p><div className="journey-track"><span style={{ width: `${completed / 5 * 100}%` }} /></div><span className="journey-caption">{5 - completed} visits remaining</span></div>
+                <span className="journey-heart" aria-hidden="true">♡</span>
+              </section>
+              <div className="section-heading visit-heading dashboard-section-heading">
+                <div className="dashboard-section-title"><span className="dashboard-section-icon" aria-hidden="true">☑</span><div><h2>Visit Checklist</h2><p>Your schedule is calculated from your expected due date.</p></div></div>
+                <span className="results-count">{visits.length} PLANNED VISITS</span>
+              </div>
+              {actionError && <ErrorBanner>{actionError}</ErrorBanner>}
+              <section className="visit-list">
+                {visits.map((visit) => <VisitRow key={visit._id} visit={visit} canLog={session.user.role === "nurse"} loading={busyVisit === visit.visitNo} onLog={() => logVisit(visit.visitNo)} />)}
+              </section>
+            </>}
+          </main>
+          <ContactStrip />
+        </div>
+      </div>
+    </div>
   );
 }
 
