@@ -4,11 +4,13 @@ import { User, Mother, Visit } from "./models.js";
 import { calculateVisitDates } from "./schedule.js";
 
 const phoneSchema = z.string().trim().regex(/^\+[1-9]\d{7,14}$/, "Enter an international phone number starting with + and the country code.");
+const preferredLanguageSchema = z.enum(["en", "rw", "fr"]);
 const registerSchema = z.object({
   role: z.enum(["nurse", "mother"]).default("mother"),
   name: z.string().trim().min(2).max(100),
   email: z.string().trim().email().max(254),
   password: z.string().min(8).max(100),
+  preferredLanguage: preferredLanguageSchema.default("en"),
   phone: phoneSchema.optional(),
   dueDate: z.coerce.date().optional(),
   nurseRegistrationCode: z.string().optional()
@@ -27,14 +29,25 @@ const passwordResetSchema = passwordResetRequestSchema.extend({
   newPassword: z.string().min(8).max(100)
 });
 const profileUpdateSchema = z.object({
-  name: z.string().trim().min(2).max(100),
-  email: z.string().trim().email().max(254),
-  phone: phoneSchema,
+  name: z.string().trim().min(2).max(100).optional(),
+  email: z.string().trim().email().max(254).optional(),
+  phone: phoneSchema.optional(),
+  preferredLanguage: preferredLanguageSchema.optional(),
   currentPassword: z.string().min(1).max(100).optional(),
   newPassword: z.string().min(8).max(100).optional()
-}).refine((input) => Boolean(input.currentPassword) === Boolean(input.newPassword), {
-  message: "Current and new passwords must be provided together."
-});
+})
+  .refine((input) => Boolean(input.currentPassword) === Boolean(input.newPassword), {
+    message: "Current and new passwords must be provided together."
+  })
+  .refine((input) => Boolean(
+    input.name
+    || input.email
+    || input.phone
+    || input.preferredLanguage
+    || input.newPassword
+  ), {
+    message: "At least one account field must be provided."
+  });
 
 class SmsGatewayError extends Error {}
 
@@ -116,7 +129,7 @@ export function createAuthRouter(express, bcrypt) {
   router.post("/register", async (req, res, next) => {
     const input = registerSchema.safeParse(req.body);
     if (!input.success) return res.status(400).json({ error: "Invalid registration details.", details: input.error.flatten() });
-    const { role, name, email: submittedEmail, password, phone, dueDate, nurseRegistrationCode } = input.data;
+    const { role, name, email: submittedEmail, password, phone, dueDate, nurseRegistrationCode, preferredLanguage } = input.data;
     if (!phone) {
       return res.status(400).json({ error: "A phone number in international format is required." });
     }
@@ -140,13 +153,17 @@ export function createAuthRouter(express, bcrypt) {
         email,
         passwordHash: await bcrypt.hash(password, 12),
         role,
-        phone
+        phone,
+        preferredLanguage
       });
       if (role === "mother") {
         const mother = await Mother.create({ name, dueDate, phone, userId: user.id });
         await Visit.insertMany(calculateVisitDates(mother.dueDate).map((visit) => ({ ...visit, motherId: mother.id })));
       }
-      res.status(201).json({ token: issueToken(user), user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+      res.status(201).json({
+        token: issueToken(user),
+        user: { id: user.id, name: user.name, email: user.email, role: user.role, preferredLanguage: user.preferredLanguage }
+      });
     } catch (error) {
       next(error);
     }
@@ -160,7 +177,10 @@ export function createAuthRouter(express, bcrypt) {
       if (!user || !(await bcrypt.compare(input.data.password, user.passwordHash))) {
         return res.status(401).json({ error: "Email or password is incorrect." });
       }
-      res.json({ token: issueToken(user), user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+      res.json({
+        token: issueToken(user),
+        user: { id: user.id, name: user.name, email: user.email, role: user.role, preferredLanguage: user.preferredLanguage || "en" }
+      });
     } catch (error) {
       next(error);
     }
@@ -168,14 +188,23 @@ export function createAuthRouter(express, bcrypt) {
 
   router.get("/profile", requireAuth, async (req, res, next) => {
     try {
-      const user = await User.findById(req.auth.sub).select("name email phone role");
+      const user = await User.findById(req.auth.sub).select("name email phone role preferredLanguage");
       if (!user) return res.status(404).json({ error: "Account is no longer available." });
       let phone = user.phone || "";
       if (!phone && user.role === "mother") {
         const mother = await Mother.findOne({ userId: user.id }).select("phone");
         phone = mother?.phone || "";
       }
-      res.json({ user: { id: user.id, name: user.name, email: user.email, phone, role: user.role } });
+      res.json({
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          phone,
+          role: user.role,
+          preferredLanguage: user.preferredLanguage || "en"
+        }
+      });
     } catch (error) {
       next(error);
     }
@@ -183,12 +212,12 @@ export function createAuthRouter(express, bcrypt) {
 
   router.patch("/profile", requireAuth, async (req, res, next) => {
     const input = profileUpdateSchema.safeParse(req.body);
-    if (!input.success) return res.status(400).json({ error: "Enter a valid name, email, phone number, and password change if needed." });
+    if (!input.success) return res.status(400).json({ error: "Enter valid account details and a password change if needed." });
     try {
-      const user = await User.findById(req.auth.sub).select("name email phone role passwordHash authVersion");
+      const user = await User.findById(req.auth.sub).select("name email phone role preferredLanguage passwordHash authVersion");
       if (!user) return res.status(404).json({ error: "Account is no longer available." });
-      const email = input.data.email.toLowerCase();
-      if (email !== user.email && await User.exists({ email, _id: { $ne: user._id } })) {
+      const email = input.data.email?.toLowerCase();
+      if (email && email !== user.email && await User.exists({ email, _id: { $ne: user._id } })) {
         return res.status(409).json({ error: "An account with this email already exists." });
       }
       if (input.data.newPassword) {
@@ -198,16 +227,27 @@ export function createAuthRouter(express, bcrypt) {
         user.passwordHash = await bcrypt.hash(input.data.newPassword, 12);
         user.authVersion = (user.authVersion || 0) + 1;
       }
-      user.name = input.data.name;
-      user.email = email;
-      user.phone = input.data.phone;
+      if (input.data.name) user.name = input.data.name;
+      if (email) user.email = email;
+      if (input.data.phone) user.phone = input.data.phone;
+      if (input.data.preferredLanguage) user.preferredLanguage = input.data.preferredLanguage;
       await user.save();
-      if (user.role === "mother") {
-        await Mother.updateOne({ userId: user.id }, { $set: { name: user.name, phone: user.phone } });
+      if (user.role === "mother" && (input.data.name || input.data.phone)) {
+        const motherUpdates = {};
+        if (input.data.name) motherUpdates.name = user.name;
+        if (input.data.phone) motherUpdates.phone = user.phone;
+        await Mother.updateOne({ userId: user.id }, { $set: motherUpdates });
       }
       res.json({
         token: issueToken(user),
-        user: { id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role }
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+          role: user.role,
+          preferredLanguage: user.preferredLanguage || "en"
+        }
       });
     } catch (error) {
       if (error?.code === 11000) return res.status(409).json({ error: "An account with this email already exists." });

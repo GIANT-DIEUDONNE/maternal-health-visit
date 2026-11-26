@@ -4,7 +4,7 @@ import express from "express";
 import bcrypt from "bcryptjs";
 import request from "supertest";
 import { createAuthRouter, issueToken } from "../src/auth.js";
-import { Mother, User } from "../src/models.js";
+import { Mother, User, Visit } from "../src/models.js";
 
 process.env.JWT_SECRET = "test-secret-for-password-reset";
 process.env.TWILIO_ACCOUNT_SID = "ACtest";
@@ -36,6 +36,7 @@ function createTestUser() {
 
 test("login succeeds with email and password without human verification", async (t) => {
   const user = createTestUser();
+  user.preferredLanguage = "rw";
   t.mock.method(User, "findOne", async () => user);
   t.mock.method(bcrypt, "compare", async () => true);
 
@@ -47,6 +48,33 @@ test("login succeeds with email and password without human verification", async 
   assert.equal(response.status, 200);
   assert.ok(response.body.token);
   assert.equal(response.body.user.email, email);
+  assert.equal(response.body.user.preferredLanguage, "rw");
+});
+
+test("registration saves the selected language on the new account", async (t) => {
+  let savedUser;
+  t.mock.method(User, "exists", async () => false);
+  t.mock.method(User, "create", async (details) => {
+    savedUser = details;
+    return { ...createTestUser(), ...details, id: "507f1f77bcf86cd799439011", authVersion: 0 };
+  });
+  t.mock.method(Mother, "create", async (details) => ({ ...details, id: "507f1f77bcf86cd799439012" }));
+  t.mock.method(Visit, "insertMany", async () => []);
+  t.mock.method(bcrypt, "hash", async () => "hashed:password123");
+
+  const response = await request(createTestApp()).post("/api/auth/register").send({
+    role: "mother",
+    name: "Test Mother",
+    email: "new-mother@test.local",
+    password: "password123",
+    phone,
+    dueDate: new Date(Date.now() + 60 * 86400000).toISOString(),
+    preferredLanguage: "fr"
+  });
+
+  assert.equal(response.status, 201);
+  assert.equal(savedUser.preferredLanguage, "fr");
+  assert.equal(response.body.user.preferredLanguage, "fr");
 });
 
 for (const role of ["mother", "nurse"]) {
@@ -152,6 +180,55 @@ test("account updates reject duplicate email addresses", async (t) => {
 
   assert.equal(response.status, 409);
   assert.equal(user.email, email);
+});
+
+test("users can save and retrieve a supported language preference", async (t) => {
+  const user = createTestUser();
+  user._id = user.id;
+  t.mock.method(User, "findById", () => ({ select: async () => user }));
+
+  const app = createTestApp();
+  const authorization = `Bearer ${issueToken(user)}`;
+  const updated = await request(app)
+    .patch("/api/auth/profile")
+    .set("Authorization", authorization)
+    .send({ preferredLanguage: "rw" });
+
+  assert.equal(updated.status, 200);
+  assert.equal(user.preferredLanguage, "rw");
+  assert.equal(updated.body.user.preferredLanguage, "rw");
+
+  const profile = await request(app).get("/api/auth/profile").set("Authorization", authorization);
+  assert.equal(profile.status, 200);
+  assert.equal(profile.body.user.preferredLanguage, "rw");
+});
+
+test("accounts without a saved language use English by default", async (t) => {
+  const user = createTestUser();
+  user._id = user.id;
+  t.mock.method(User, "findById", () => ({ select: async () => user }));
+
+  const response = await request(createTestApp())
+    .get("/api/auth/profile")
+    .set("Authorization", `Bearer ${issueToken(user)}`);
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body.user.preferredLanguage, "en");
+});
+
+test("account updates reject unsupported language preferences", async (t) => {
+  const user = createTestUser();
+  user._id = user.id;
+  t.mock.method(User, "findById", () => ({ select: async () => user }));
+
+  const response = await request(createTestApp())
+    .patch("/api/auth/profile")
+    .set("Authorization", `Bearer ${issueToken(user)}`)
+    .send({ preferredLanguage: "es" });
+
+  assert.equal(response.status, 400);
+  assert.equal(user.preferredLanguage, undefined);
+  assert.equal(user.saved, undefined);
 });
 
 test("SMS verification code updates the password and invalidates existing tokens", async (t) => {
