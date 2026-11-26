@@ -198,6 +198,16 @@ h1, h2, h3 { font-family: Manrope, sans-serif; letter-spacing: -1px; }
 .settings-details div { min-width: 0; }
 .settings-details dt { margin-bottom: 4px; color: #856e9b; font-size: 9px; }
 .settings-details dd { overflow-wrap: anywhere; margin: 0; color: #392257; font-size: 11px; font-weight: 600; }
+.settings-edit-button { margin-left: auto; }
+.settings-account-form { display: grid; gap: 16px; }
+.settings-account-fields, .settings-password-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px; }
+.settings-password-section { padding-top: 13px; border-top: 1px solid #f0e8f7; }
+.settings-password-section summary { color: #6f1ab0; cursor: pointer; font-size: 11px; font-weight: 700; }
+.settings-password-section[open] summary { margin-bottom: 13px; }
+.settings-password-fields .field:last-child { grid-column: span 2; }
+.settings-account-actions { display: flex; justify-content: flex-end; gap: 9px; }
+.settings-account-actions .button-primary { background: #7116bd; }
+.settings-success { margin: 0 0 13px; color: #18745a; font-size: 11px; font-weight: 600; }
 .settings-toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 0 2px; border-top: 1px solid #f0e8f7; }
 .settings-switch { width: 44px; height: 25px; flex: 0 0 44px; display: flex; align-items: center; padding: 3px; border: 0; border-radius: 20px; background: #b6a9c2; cursor: pointer; transition: background .16s; }
 .settings-switch[aria-checked="true"] { justify-content: flex-end; background: #7620bd; }
@@ -380,6 +390,10 @@ h1, h2, h3 { font-family: Manrope, sans-serif; letter-spacing: -1px; }
   .sidebar-nav > .sidebar-link:nth-child(2), .sidebar-nav > .sidebar-link:nth-child(7) { display: none; }
   .settings-page { padding-top: 32px; }
   .settings-card { padding: 17px 16px; }
+  .settings-account-fields, .settings-password-fields { grid-template-columns: 1fr; }
+  .settings-password-fields .field:last-child { grid-column: auto; }
+  .settings-account-actions { justify-content: stretch; }
+  .settings-account-actions .button { flex: 1; }
   .settings-support { align-items: flex-start; flex-direction: column; gap: 11px; }
   .message-contact-card { flex-wrap: wrap; gap: 10px; padding: 12px; }
   .message-contact-info { min-width: calc(100% - 60px); }

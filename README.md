@@ -25,6 +25,7 @@ All routes except `/api/auth/register`, `/api/auth/login`, `/api/auth/forgot-pas
 
 - `POST /api/auth/forgot-password` with `{ "email": "...", "phone": "+1234567890" }` — sends a Twilio Verify SMS code when the account details match
 - `POST /api/auth/reset-password` with `{ "email": "...", "phone": "+1234567890", "code": "...", "newPassword": "..." }` — verifies the SMS code and updates the password
+- `GET /api/auth/profile` and `PATCH /api/auth/profile` — view or update the authenticated user's name, email, and phone; password changes require the current password and invalidate other sessions
 
 - `GET /api/mothers?page=1&limit=10` — paginated list (nurses see all; mothers see only their own)
 - `POST /api/mothers` — nurse creates a mother and generated visit schedule

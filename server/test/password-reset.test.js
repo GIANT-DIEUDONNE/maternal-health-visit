@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import express from "express";
 import bcrypt from "bcryptjs";
 import request from "supertest";
-import { createAuthRouter } from "../src/auth.js";
+import { createAuthRouter, issueToken } from "../src/auth.js";
 import { Mother, User } from "../src/models.js";
 
 process.env.JWT_SECRET = "test-secret-for-password-reset";
@@ -47,6 +47,111 @@ test("login succeeds with email and password without human verification", async 
   assert.equal(response.status, 200);
   assert.ok(response.body.token);
   assert.equal(response.body.user.email, email);
+});
+
+for (const role of ["mother", "nurse"]) {
+  test(`${role} can update their own account details`, async (t) => {
+    const user = createTestUser();
+    user._id = user.id;
+    user.role = role;
+    let motherUpdateCount = 0;
+    let motherUpdate;
+    t.mock.method(User, "findById", () => ({ select: async () => user }));
+    t.mock.method(User, "exists", async () => false);
+    t.mock.method(Mother, "updateOne", async (...args) => {
+      motherUpdateCount += 1;
+      motherUpdate = args;
+      return { matchedCount: 1 };
+    });
+
+    const response = await request(createTestApp())
+      .patch("/api/auth/profile")
+      .set("Authorization", `Bearer ${issueToken(user)}`)
+      .send({ name: "Updated Name", email: "updated@test.local", phone: "+250788123456", role: "nurse" });
+
+    assert.equal(response.status, 200);
+    assert.equal(user.name, "Updated Name");
+    assert.equal(user.email, "updated@test.local");
+    assert.equal(user.phone, "+250788123456");
+    assert.equal(user.role, role);
+    assert.equal(response.body.user.role, role);
+    assert.ok(response.body.token);
+    assert.equal(motherUpdateCount, role === "mother" ? 1 : 0);
+    if (role === "mother") {
+      assert.deepEqual(motherUpdate, [
+        { userId: user.id },
+        { $set: { name: "Updated Name", phone: "+250788123456" } }
+      ]);
+    }
+  });
+}
+
+test("a password change rejects an incorrect current password", async (t) => {
+  const user = createTestUser();
+  user._id = user.id;
+  user.role = "nurse";
+  t.mock.method(User, "findById", () => ({ select: async () => user }));
+  t.mock.method(bcrypt, "compare", async () => false);
+
+  const response = await request(createTestApp())
+    .patch("/api/auth/profile")
+    .set("Authorization", `Bearer ${issueToken(user)}`)
+    .send({
+      name: user.name,
+      email: user.email,
+      phone,
+      currentPassword: "wrong-password",
+      newPassword: "new-password-123"
+    });
+
+  assert.equal(response.status, 400);
+  assert.equal(user.passwordHash, "old-password-hash");
+  assert.equal(user.authVersion, 0);
+  assert.equal(user.saved, undefined);
+});
+
+test("changing a password with the correct current password refreshes the session", async (t) => {
+  const user = createTestUser();
+  user._id = user.id;
+  user.role = "nurse";
+  t.mock.method(User, "findById", () => ({ select: async () => user }));
+  t.mock.method(User, "exists", async () => false);
+  t.mock.method(bcrypt, "compare", async (password) => password === "old-password");
+  t.mock.method(bcrypt, "hash", async (password) => `hashed:${password}`);
+  const app = createTestApp();
+  const oldToken = issueToken(user);
+
+  const response = await request(app)
+    .patch("/api/auth/profile")
+    .set("Authorization", `Bearer ${oldToken}`)
+    .send({
+      name: user.name,
+      email: user.email,
+      phone,
+      currentPassword: "old-password",
+      newPassword: "new-password-123"
+    });
+
+  assert.equal(response.status, 200);
+  assert.equal(user.passwordHash, "hashed:new-password-123");
+  assert.equal(user.authVersion, 1);
+  assert.equal((await request(app).get("/api/auth/profile").set("Authorization", `Bearer ${oldToken}`)).status, 401);
+  assert.equal((await request(app).get("/api/auth/profile").set("Authorization", `Bearer ${response.body.token}`)).status, 200);
+});
+
+test("account updates reject duplicate email addresses", async (t) => {
+  const user = createTestUser();
+  user._id = user.id;
+  t.mock.method(User, "findById", () => ({ select: async () => user }));
+  t.mock.method(User, "exists", async () => true);
+
+  const response = await request(createTestApp())
+    .patch("/api/auth/profile")
+    .set("Authorization", `Bearer ${issueToken(user)}`)
+    .send({ name: user.name, email: "taken@test.local", phone });
+
+  assert.equal(response.status, 409);
+  assert.equal(user.email, email);
 });
 
 test("SMS verification code updates the password and invalidates existing tokens", async (t) => {

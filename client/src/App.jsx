@@ -35,10 +35,13 @@ function App() {
   const dashboardArea = ["/dashboard", "/settings", "/messages", "/health-records"].includes(location.pathname)
     || (location.pathname.startsWith("/mothers/") && location.pathname !== "/mothers/new");
   const visitReminder = useVisitReminder(session?.token, session?.user?.role === "mother", remindersEnabled);
-  const onAuthenticated = (value) => {
+  const updateSession = (value) => {
     localStorage.setItem("maternal-session", JSON.stringify(value));
     setSession(value);
     setRemindersEnabled(readReminderPreference(value.user.email));
+  };
+  const onAuthenticated = (value) => {
+    updateSession(value);
     navigate("/dashboard");
   };
   const logout = () => {
@@ -61,7 +64,7 @@ function App() {
         <Route path="/forgot-password" element={session ? <Navigate to="/dashboard" replace /> : <ForgotPasswordPage />} />
         <Route path="/register" element={session ? <Navigate to="/dashboard" replace /> : <AuthPage register onAuthenticated={onAuthenticated} />} />
         <Route path="/dashboard" element={<Protected session={session}><Dashboard session={session} visitReminder={visitReminder} onLogout={logout} /></Protected>} />
-        <Route path="/settings" element={<Protected session={session}><SettingsPage session={session} visitReminder={visitReminder} remindersEnabled={remindersEnabled} onReminderPreferenceChange={updateReminderPreference} onLogout={logout} /></Protected>} />
+        <Route path="/settings" element={<Protected session={session}><SettingsPage session={session} visitReminder={visitReminder} remindersEnabled={remindersEnabled} onReminderPreferenceChange={updateReminderPreference} onSessionUpdate={updateSession} onLogout={logout} /></Protected>} />
         <Route path="/messages" element={<Protected session={session}><MessagesPage session={session} visitReminder={visitReminder} onLogout={logout} /></Protected>} />
         <Route path="/health-records" element={<Protected session={session}><HealthRecordsPage session={session} visitReminder={visitReminder} onLogout={logout} /></Protected>} />
         <Route path="/mothers/new" element={<Protected session={session} role="nurse"><MotherForm session={session} /></Protected>} />
@@ -557,8 +560,31 @@ function Dashboard({ session, visitReminder, onLogout }) {
   );
 }
 
-function SettingsPage({ session, visitReminder, remindersEnabled, onReminderPreferenceChange, onLogout }) {
+function SettingsPage({ session, visitReminder, remindersEnabled, onReminderPreferenceChange, onSessionUpdate, onLogout }) {
   const [preferenceError, setPreferenceError] = useState("");
+  const [profile, setProfile] = useState({ name: session.user.name, email: session.user.email, phone: session.user.phone || "", role: session.user.role });
+  const [profileForm, setProfileForm] = useState({ ...profile, currentPassword: "", newPassword: "", confirmPassword: "" });
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileEditing, setProfileEditing] = useState(false);
+  const [profileError, setProfileError] = useState("");
+  const [profileMessage, setProfileMessage] = useState("");
+  useEffect(() => {
+    let active = true;
+    api("/auth/profile", { token: session.token })
+      .then(({ user }) => {
+        if (!active) return;
+        setProfile(user);
+        setProfileForm({ ...user, currentPassword: "", newPassword: "", confirmPassword: "" });
+      })
+      .catch((error) => {
+        if (active) setProfileError(error.message);
+      })
+      .finally(() => {
+        if (active) setProfileLoading(false);
+      });
+    return () => { active = false; };
+  }, [session.token]);
   const updateReminderPreference = (enabled) => {
     setPreferenceError("");
     try {
@@ -567,7 +593,55 @@ function SettingsPage({ session, visitReminder, remindersEnabled, onReminderPref
       setPreferenceError("Your reminder preference could not be saved. Check your browser storage and try again.");
     }
   };
-  const initials = session.user.name.split(/\s+/).map((part) => part[0]).slice(0, 2).join("").toUpperCase();
+  const updateProfileField = (field, value) => setProfileForm((current) => ({ ...current, [field]: value }));
+  const editProfile = () => {
+    setProfileError("");
+    setProfileMessage("");
+    setProfileForm({ ...profile, currentPassword: "", newPassword: "", confirmPassword: "" });
+    setProfileEditing(true);
+  };
+  const cancelProfileEdit = () => {
+    setProfileError("");
+    setProfileForm({ ...profile, currentPassword: "", newPassword: "", confirmPassword: "" });
+    setProfileEditing(false);
+  };
+  const saveProfile = async (event) => {
+    event.preventDefault();
+    setProfileError("");
+    setProfileMessage("");
+    if ((profileForm.newPassword || profileForm.confirmPassword) && profileForm.newPassword !== profileForm.confirmPassword) {
+      setProfileError("The new passwords do not match.");
+      return;
+    }
+    if (Boolean(profileForm.currentPassword) !== Boolean(profileForm.newPassword)) {
+      setProfileError("Enter both your current password and a new password to change your password.");
+      return;
+    }
+    setProfileSaving(true);
+    try {
+      const body = { name: profileForm.name, email: profileForm.email, phone: profileForm.phone };
+      if (profileForm.newPassword) {
+        body.currentPassword = profileForm.currentPassword;
+        body.newPassword = profileForm.newPassword;
+      }
+      const updated = await api("/auth/profile", {
+        token: session.token,
+        method: "PATCH",
+        body: JSON.stringify(body)
+      });
+      const nextSession = { token: updated.token, user: updated.user };
+      onSessionUpdate(nextSession);
+      setProfile(updated.user);
+      setProfileForm({ ...updated.user, currentPassword: "", newPassword: "", confirmPassword: "" });
+      setProfileEditing(false);
+      setProfileMessage("Your account details have been updated.");
+    } catch (error) {
+      setProfileError(error.message);
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+  const initials = profile.name.split(/\s+/).map((part) => part[0]).slice(0, 2).join("").toUpperCase();
 
   return (
     <div className={`dashboard-layout dashboard-role-${session.user.role}`}>
@@ -584,17 +658,45 @@ function SettingsPage({ session, visitReminder, remindersEnabled, onReminderPref
             <section className="settings-card" aria-labelledby="account-details-title">
               <div className="settings-card-heading">
                 <span className="settings-card-icon" aria-hidden="true">♙</span>
-                <div><h2 id="account-details-title">Account details</h2><p>Your registered account information.</p></div>
+                <div><h2 id="account-details-title">Account details</h2><p>Edit your profile and sign-in information.</p></div>
+                {!profileEditing && <button className="button button-outline button-small settings-edit-button" type="button" disabled={profileLoading} onClick={editProfile}>Edit account</button>}
               </div>
-              <div className="settings-profile">
-                <span className="settings-avatar" aria-hidden="true">{initials}</span>
-                <div><strong>{session.user.name}</strong><span>{session.user.role === "nurse" ? "Nurse account" : "Mother account"}</span></div>
-              </div>
-              <dl className="settings-details">
-                <div><dt>Email address</dt><dd>{session.user.email}</dd></div>
-                <div><dt>Account role</dt><dd>{session.user.role === "nurse" ? "Nurse" : "Mother"}</dd></div>
-                {session.user.phone && <div><dt>Phone number</dt><dd>{session.user.phone}</dd></div>}
-              </dl>
+              {profileError && !profileEditing && <ErrorBanner>{profileError}</ErrorBanner>}
+              {profileMessage && <p className="settings-success" role="status">{profileMessage}</p>}
+              {profileEditing ? (
+                <form className="settings-account-form" onSubmit={saveProfile}>
+                  <div className="settings-account-fields">
+                    <Field label="Full name" autoComplete="name" value={profileForm.name} onChange={(name) => updateProfileField("name", name)} minLength="2" maxLength="100" required />
+                    <Field label="Email address" type="email" autoComplete="email" value={profileForm.email} onChange={(email) => updateProfileField("email", email)} maxLength="254" required />
+                    <Field label="Phone number (include country code)" type="tel" autoComplete="tel" placeholder="+250790000000" value={profileForm.phone} onChange={(phone) => updateProfileField("phone", phone)} required />
+                  </div>
+                  <details className="settings-password-section">
+                    <summary>Change password (optional)</summary>
+                    <div className="settings-password-fields">
+                      <Field label="Current password" type="password" autoComplete="current-password" value={profileForm.currentPassword} onChange={(currentPassword) => updateProfileField("currentPassword", currentPassword)} />
+                      <Field label="New password" type="password" autoComplete="new-password" value={profileForm.newPassword} onChange={(newPassword) => updateProfileField("newPassword", newPassword)} minLength="8" maxLength="100" />
+                      <Field label="Confirm new password" type="password" autoComplete="new-password" value={profileForm.confirmPassword} onChange={(confirmPassword) => updateProfileField("confirmPassword", confirmPassword)} minLength="8" maxLength="100" />
+                    </div>
+                  </details>
+                  {profileError && <ErrorBanner>{profileError}</ErrorBanner>}
+                  <div className="settings-account-actions">
+                    <button className="button button-outline button-small" type="button" disabled={profileSaving} onClick={cancelProfileEdit}>Cancel</button>
+                    <button className="button button-primary button-small" type="submit" disabled={profileSaving}>{profileSaving ? "Updating..." : "Update account"}</button>
+                  </div>
+                </form>
+              ) : (
+                <>
+                  <div className="settings-profile">
+                    <span className="settings-avatar" aria-hidden="true">{initials}</span>
+                    <div><strong>{profile.name}</strong><span>{profile.role === "nurse" ? "Nurse account" : "Mother account"}</span></div>
+                  </div>
+                  <dl className="settings-details">
+                    <div><dt>Email address</dt><dd>{profile.email}</dd></div>
+                    <div><dt>Account role</dt><dd>{profile.role === "nurse" ? "Nurse" : "Mother"}</dd></div>
+                    {profile.phone && <div><dt>Phone number</dt><dd>{profile.phone}</dd></div>}
+                  </dl>
+                </>
+              )}
             </section>
             <section className="settings-card" aria-labelledby="reminder-settings-title">
               <div className="settings-card-heading">

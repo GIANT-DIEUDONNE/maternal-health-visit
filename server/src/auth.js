@@ -26,6 +26,15 @@ const passwordResetSchema = passwordResetRequestSchema.extend({
   code: z.string().trim().regex(/^\d{4,10}$/),
   newPassword: z.string().min(8).max(100)
 });
+const profileUpdateSchema = z.object({
+  name: z.string().trim().min(2).max(100),
+  email: z.string().trim().email().max(254),
+  phone: phoneSchema,
+  currentPassword: z.string().min(1).max(100).optional(),
+  newPassword: z.string().min(8).max(100).optional()
+}).refine((input) => Boolean(input.currentPassword) === Boolean(input.newPassword), {
+  message: "Current and new passwords must be provided together."
+});
 
 class SmsGatewayError extends Error {}
 
@@ -153,6 +162,55 @@ export function createAuthRouter(express, bcrypt) {
       }
       res.json({ token: issueToken(user), user: { id: user.id, name: user.name, email: user.email, role: user.role } });
     } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get("/profile", requireAuth, async (req, res, next) => {
+    try {
+      const user = await User.findById(req.auth.sub).select("name email phone role");
+      if (!user) return res.status(404).json({ error: "Account is no longer available." });
+      let phone = user.phone || "";
+      if (!phone && user.role === "mother") {
+        const mother = await Mother.findOne({ userId: user.id }).select("phone");
+        phone = mother?.phone || "";
+      }
+      res.json({ user: { id: user.id, name: user.name, email: user.email, phone, role: user.role } });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.patch("/profile", requireAuth, async (req, res, next) => {
+    const input = profileUpdateSchema.safeParse(req.body);
+    if (!input.success) return res.status(400).json({ error: "Enter a valid name, email, phone number, and password change if needed." });
+    try {
+      const user = await User.findById(req.auth.sub).select("name email phone role passwordHash authVersion");
+      if (!user) return res.status(404).json({ error: "Account is no longer available." });
+      const email = input.data.email.toLowerCase();
+      if (email !== user.email && await User.exists({ email, _id: { $ne: user._id } })) {
+        return res.status(409).json({ error: "An account with this email already exists." });
+      }
+      if (input.data.newPassword) {
+        if (!(await bcrypt.compare(input.data.currentPassword, user.passwordHash))) {
+          return res.status(400).json({ error: "Current password is incorrect." });
+        }
+        user.passwordHash = await bcrypt.hash(input.data.newPassword, 12);
+        user.authVersion = (user.authVersion || 0) + 1;
+      }
+      user.name = input.data.name;
+      user.email = email;
+      user.phone = input.data.phone;
+      await user.save();
+      if (user.role === "mother") {
+        await Mother.updateOne({ userId: user.id }, { $set: { name: user.name, phone: user.phone } });
+      }
+      res.json({
+        token: issueToken(user),
+        user: { id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role }
+      });
+    } catch (error) {
+      if (error?.code === 11000) return res.status(409).json({ error: "An account with this email already exists." });
       next(error);
     }
   });
