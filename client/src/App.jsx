@@ -4,6 +4,7 @@ import { api } from "./api.js";
 
 const SUPPORT_PHONE = "+250790684556";
 const SUPPORT_EMAIL = "support@maternalhealth.rw";
+const SUPPORT_WHATSAPP_MESSAGE = "Hello, I need help with my maternal health account or care plan.";
 
 function readSession() {
   try {
@@ -331,7 +332,10 @@ function AuthPage({ register = false, onAuthenticated }) {
           <strong>Maternal Health Visit Reminder</strong>
         </Link>
         <span className="login-footer-message">Together for a healthier tomorrow <span aria-hidden="true">♥</span></span>
-        {!register && <a className="login-footer-contact" href={`tel:${SUPPORT_PHONE}`}>Contact us: {SUPPORT_PHONE}</a>}
+        {!register && <>
+          <a className="login-footer-contact" href={`tel:${SUPPORT_PHONE}`}>Call support: {SUPPORT_PHONE}</a>
+          <a className="login-footer-contact" href={whatsAppUrl(SUPPORT_PHONE, SUPPORT_WHATSAPP_MESSAGE)} target="_blank" rel="noopener noreferrer">WhatsApp support</a>
+        </>}
       </footer>
       {register && <ContactStrip />}
     </div>
@@ -409,7 +413,7 @@ function ForgotPasswordPage() {
             <button className="button button-primary full-width" disabled={busy}>{busy ? "Please wait..." : step === "request" ? "Send verification code" : "Update password"} <span>→</span></button>
           </form>
         )}
-        {!complete && <p className="recovery-contact">Can’t access your registered phone? <a href={`tel:${SUPPORT_PHONE}`}>Call {SUPPORT_PHONE}</a></p>}
+        {!complete && <p className="recovery-contact">Can’t access your registered phone? <a href={`tel:${SUPPORT_PHONE}`}>Call {SUPPORT_PHONE}</a> or <a href={whatsAppUrl(SUPPORT_PHONE, SUPPORT_WHATSAPP_MESSAGE)} target="_blank" rel="noopener noreferrer">WhatsApp support</a>.</p>}
         {!complete && <p className="auth-switch">
           {step === "reset" && <button type="button" className="plain-link" onClick={() => { setError(""); setMessage(""); setStep("request"); }}>Use different details</button>}
           <Link to="/login">Back to sign in</Link>
@@ -670,7 +674,7 @@ function MessagesPage({ session, visitReminder, onLogout }) {
                     <a className="button button-primary" href={`tel:${SUPPORT_PHONE}`}>Call support</a>
                     <a className="button button-outline" href={`sms:${phoneForSms(SUPPORT_PHONE)}`}>Send SMS</a>
                     <a className="button button-outline" href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(SUPPORT_EMAIL)}&su=${encodeURIComponent("Maternal Health support request")}&body=${encodeURIComponent("Hello, I need help with my maternal health account or care plan.")}`} target="_blank" rel="noopener noreferrer">Email support (Gmail)</a>
-                    <a className="button button-outline" href={whatsAppUrl(SUPPORT_PHONE)} target="_blank" rel="noopener noreferrer">WhatsApp</a>
+                    <a className="button button-outline" href={whatsAppUrl(SUPPORT_PHONE, SUPPORT_WHATSAPP_MESSAGE)} target="_blank" rel="noopener noreferrer">WhatsApp support</a>
                   </div>
                 </div>
               </section>
@@ -704,11 +708,12 @@ function phoneForSms(phone) {
   return value.startsWith("+") ? `+${digits}` : digits;
 }
 
-function whatsAppUrl(phone) {
+function whatsAppUrl(phone, message = "") {
   const value = String(phone || "").trim();
   const digits = value.replace(/\D/g, "");
-  if (value.startsWith("+")) return digits ? `https://wa.me/${digits}` : "";
-  if (digits.startsWith("0")) return `https://wa.me/250${digits.slice(1)}`;
+  const text = message ? `?text=${encodeURIComponent(message)}` : "";
+  if (value.startsWith("+")) return digits ? `https://wa.me/${digits}${text}` : "";
+  if (digits.startsWith("0")) return `https://wa.me/250${digits.slice(1)}${text}`;
   return "";
 }
 
@@ -758,6 +763,10 @@ function ContactStrip() {
             <a href={`tel:${SUPPORT_PHONE}`}>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3H4a1 1 0 0 0-1 1c0 9.4 7.6 17 17 17a1 1 0 0 0 1-1v-3l-5-2-2 3a14 14 0 0 1-7-7l3-2-2-5z" /></svg>
               <span>{SUPPORT_PHONE}</span>
+            </a>
+            <a href={whatsAppUrl(SUPPORT_PHONE, SUPPORT_WHATSAPP_MESSAGE)} target="_blank" rel="noopener noreferrer">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.2 11.7a8.2 8.2 0 0 1-12.1 7.2L4 20l1.2-3.9a8.2 8.2 0 1 1 15-4.4z" /><path d="M8.8 8.2c.2-.5.5-.5.8-.5h.5c.2 0 .4.1.5.4l.7 1.7c.1.2.1.4-.1.6l-.5.6c-.2.2-.2.4 0 .6.4.7 1 1.3 1.7 1.7.2.1.4.1.6-.1l.6-.7c.2-.2.4-.2.6-.1l1.6.8c.2.1.4.2.4.4 0 .3-.2 1.2-.8 1.6-.5.4-1.1.5-1.8.3-1.1-.3-2.5-1.1-3.7-2.2-1.2-1.2-2-2.6-2.3-3.7-.2-.6-.1-1.2.3-1.7.2-.3.6-.6.9-.7z" /></svg>
+              <span>WhatsApp support</span>
             </a>
           </div>
         </div>
