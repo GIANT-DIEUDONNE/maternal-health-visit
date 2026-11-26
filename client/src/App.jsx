@@ -380,46 +380,81 @@ function ForgotPasswordPage() {
   };
 
   return (
-    <main className="auth-layout">
-      <section className="auth-intro">
-        <span className="eyebrow">ACCOUNT SUPPORT</span>
-        <h1>Reset your password securely.</h1>
-        <p>We’ll send a verification code to the phone number registered to your account.</p>
-        <div className="intro-note"><span className="note-icon">✳</span><span>Your phone number helps protect your account.</span></div>
-      </section>
-      <section className="auth-card">
-        <div className="card-kicker">{complete ? "PASSWORD UPDATED" : "ACCOUNT RECOVERY"}</div>
-        <h2>{complete ? "Your password is reset" : step === "request" ? "Forgot your password?" : "Enter your new password"}</h2>
-        <p className="form-subtitle">
-          {complete
-            ? "You can now sign in with your new password."
-            : step === "request"
-              ? "Enter your account email and registered phone number in international format, starting with +."
-              : message}
-        </p>
-        {complete ? (
-          <Link className="button button-primary full-width" to="/login">Back to sign in</Link>
-        ) : (
-          <form onSubmit={submit} className="form-stack">
-            {step === "request" ? <>
-              <Field label="Email address" type="email" value={values.email} onChange={(email) => setValues({ ...values, email })} required />
-              <Field label="Phone number (include country code)" type="tel" placeholder="+1234567890" autoComplete="tel" value={values.phone} onChange={(phone) => setValues({ ...values, phone })} required />
-            </> : <>
-              <Field label="SMS verification code" inputMode="numeric" autoComplete="one-time-code" value={values.code} onChange={(code) => setValues({ ...values, code })} required />
-              <Field label="New password" type="password" minLength="8" value={values.newPassword} onChange={(newPassword) => setValues({ ...values, newPassword })} required />
-              <Field label="Confirm new password" type="password" minLength="8" value={values.confirmPassword} onChange={(confirmPassword) => setValues({ ...values, confirmPassword })} required />
-            </>}
-            {error && <ErrorBanner>{error}</ErrorBanner>}
-            <button className="button button-primary full-width" disabled={busy}>{busy ? "Please wait..." : step === "request" ? "Send verification code" : "Update password"} <span>→</span></button>
-          </form>
-        )}
-        {!complete && <p className="recovery-contact">Can’t access your registered phone? <a href={`tel:${SUPPORT_PHONE}`}>Call {SUPPORT_PHONE}</a> or <a href={whatsAppUrl(SUPPORT_PHONE, SUPPORT_WHATSAPP_MESSAGE)} target="_blank" rel="noopener noreferrer">WhatsApp support</a>.</p>}
-        {!complete && <p className="auth-switch">
-          {step === "reset" && <button type="button" className="plain-link" onClick={() => { setError(""); setMessage(""); setStep("request"); }}>Use different details</button>}
-          <Link to="/login">Back to sign in</Link>
-        </p>}
-      </section>
-    </main>
+    <div className="login-page recovery-page">
+      <header className="login-header">
+        <Link className="login-brand" to="/" aria-label="Maternal Health Visit Reminder home">
+          <span className="login-brand-mark" aria-hidden="true">♡</span>
+          <span>Maternal Health<small>Visit Reminder</small></span>
+        </Link>
+        <nav className="login-nav" aria-label="Main navigation">
+          <Link to="/">Home</Link>
+          <Link to="/#about">About</Link>
+          <Link to="/#features">Features</Link>
+          <Link to="/#how-it-works">How It Works</Link>
+          <Link to="/#contact">Contact</Link>
+        </nav>
+        <div className="login-header-actions">
+          <Link className="login-header-signin" to="/login">Sign In</Link>
+          <Link className="login-header-signup" to="/register">Sign Up</Link>
+        </div>
+      </header>
+      <main className="login-hero recovery-hero">
+        <div className="login-photo" role="img" aria-label="A pregnant mother meeting with a nurse for prenatal care" />
+        <section className="login-intro recovery-intro">
+          <span className="login-kicker"><span aria-hidden="true">♥</span> ACCOUNT SUPPORT</span>
+          <h1>{complete ? <>Welcome back to your <span>care journey.</span></> : <>Let’s get you back to your <span>care journey.</span></>}</h1>
+          <p>{complete ? "Your password has been updated. Sign in to continue keeping your care plan on track." : "Reset your password securely and get back to the support and visit plan you need."}</p>
+          <ul className="login-benefits recovery-benefits" aria-label="Secure recovery steps">
+            <li><span aria-hidden="true">1</span>Confirm your<br />account</li>
+            <li><span aria-hidden="true">2</span>Verify your<br />phone</li>
+            <li><span aria-hidden="true">3</span>Choose a new<br />password</li>
+          </ul>
+          <p className="login-tagline">Healthy Mother. Healthy Baby. A Healthier World.</p>
+        </section>
+        <section className="login-card recovery-card" aria-labelledby="recovery-title">
+          <span className="login-lock" aria-hidden="true">{complete ? "✓" : "🔒"}</span>
+          <div className="signup-kicker">{complete ? "PASSWORD UPDATED" : "ACCOUNT RECOVERY"}</div>
+          <h2 id="recovery-title">{complete ? "Your password is reset" : step === "request" ? "Forgot your password?" : "Enter your new password"}</h2>
+          <p className="form-subtitle">
+            {complete
+              ? "You can now sign in with your new password."
+              : step === "request"
+                ? "Enter your account email and registered phone number in international format, starting with +."
+                : message}
+          </p>
+          {complete ? (
+            <Link className="button button-primary full-width" to="/login">Back to sign in <span>→</span></Link>
+          ) : (
+            <form onSubmit={submit} className="form-stack">
+              {step === "request" ? <>
+                <Field label="Email address" type="email" value={values.email} onChange={(email) => setValues({ ...values, email })} required />
+                <Field label="Phone number (include country code)" type="tel" placeholder="+1234567890" autoComplete="tel" value={values.phone} onChange={(phone) => setValues({ ...values, phone })} required />
+              </> : <>
+                <Field label="SMS verification code" inputMode="numeric" autoComplete="one-time-code" value={values.code} onChange={(code) => setValues({ ...values, code })} required />
+                <Field label="New password" type="password" minLength="8" value={values.newPassword} onChange={(newPassword) => setValues({ ...values, newPassword })} required />
+                <Field label="Confirm new password" type="password" minLength="8" value={values.confirmPassword} onChange={(confirmPassword) => setValues({ ...values, confirmPassword })} required />
+              </>}
+              {error && <ErrorBanner>{error}</ErrorBanner>}
+              <button className="button button-primary full-width" disabled={busy}>{busy ? "Please wait..." : step === "request" ? "Send verification code" : "Update password"} <span>→</span></button>
+            </form>
+          )}
+          {!complete && <p className="recovery-contact">Can’t access your registered phone? <a href={`tel:${SUPPORT_PHONE}`}>Call {SUPPORT_PHONE}</a> or <a href={whatsAppUrl(SUPPORT_PHONE, SUPPORT_WHATSAPP_MESSAGE)} target="_blank" rel="noopener noreferrer">WhatsApp support</a>.</p>}
+          {!complete && <p className="auth-switch">
+            {step === "reset" && <button type="button" className="plain-link" onClick={() => { setError(""); setMessage(""); setStep("request"); }}>Use different details</button>}
+            <Link to="/login">Back to sign in</Link>
+          </p>}
+        </section>
+      </main>
+      <footer className="login-footer">
+        <Link className="login-footer-brand" to="/">
+          <span className="login-footer-mark" aria-hidden="true">♡</span>
+          <strong>Maternal Health Visit Reminder</strong>
+        </Link>
+        <span className="login-footer-message">Together for a healthier tomorrow <span aria-hidden="true">♥</span></span>
+        <a className="login-footer-contact" href={`tel:${SUPPORT_PHONE}`}>Call support: {SUPPORT_PHONE}</a>
+        <a className="login-footer-contact" href={whatsAppUrl(SUPPORT_PHONE, SUPPORT_WHATSAPP_MESSAGE)} target="_blank" rel="noopener noreferrer">WhatsApp support</a>
+      </footer>
+    </div>
   );
 }
 
