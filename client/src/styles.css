@@ -379,7 +379,7 @@ h1, h2, h3 { font-family: Manrope, sans-serif; letter-spacing: -1px; }
   .dashboard-section-heading .results-count { padding: 7px 9px; font-size: 8px; }
   .dashboard-page .mother-grid { grid-template-columns: 1fr; gap: 9px; }
   .dashboard-page .mother-card { min-height: 100px; }
-  .dashboard-sidebar { position: fixed; z-index: 10; right: 0; bottom: 0; left: 0; width: auto; height: auto; padding: 7px 8px max(7px, env(safe-area-inset-bottom)); border-top: 1px solid #ffffff36; }
+  .dashboard-sidebar { position: fixed; z-index: 10; top: auto; right: 0; bottom: 0; left: 0; width: auto; height: auto; padding: 7px 8px max(7px, env(safe-area-inset-bottom)); border-top: 1px solid #ffffff36; }
   .sidebar-brand, .sidebar-bottom { display: none; }
   .sidebar-nav { display: flex; justify-content: space-around; gap: 5px; }
   .sidebar-link { min-width: 0; min-height: 45px; flex: 1; flex-direction: column; justify-content: center; gap: 2px; padding: 3px 4px; border-radius: 10px; font-size: 8px; text-align: center; white-space: nowrap; }
