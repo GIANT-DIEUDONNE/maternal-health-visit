@@ -48,7 +48,7 @@ function AppContent() {
   }, [session?.user?.preferredLanguage, language, setLanguage]);
   const location = useLocation();
   const navigate = useNavigate();
-  const dashboardArea = ["/dashboard", "/settings", "/messages", "/health-records"].includes(location.pathname)
+  const dashboardArea = ["/admin", "/dashboard", "/settings", "/messages", "/health-records"].includes(location.pathname)
     || (location.pathname.startsWith("/mothers/") && location.pathname !== "/mothers/new");
   const visitReminder = useVisitReminder(session?.token, session?.user?.role === "mother", remindersEnabled);
   const updateSession = (value) => {
@@ -75,7 +75,7 @@ function AppContent() {
   };
   const onAuthenticated = (value) => {
     updateSession(value);
-    navigate("/dashboard");
+    navigate(value.user.role === "admin" ? "/admin" : "/dashboard");
   };
   const logout = () => {
     localStorage.removeItem("maternal-session");
@@ -92,11 +92,12 @@ function AppContent() {
     <div className="app-shell">
       {session && !dashboardArea && <Header session={session} onLogout={logout} visitReminder={visitReminder} onLanguageChange={updateLanguage} />}
       <Routes>
-        <Route path="/" element={session ? <Navigate to="/dashboard" replace /> : <LandingPage onLanguageChange={updateLanguage} />} />
-        <Route path="/login" element={session ? <Navigate to="/dashboard" replace /> : <AuthPage onAuthenticated={onAuthenticated} onLanguageChange={updateLanguage} />} />
+        <Route path="/" element={session ? <Navigate to={session.user.role === "admin" ? "/admin" : "/dashboard"} replace /> : <LandingPage onLanguageChange={updateLanguage} />} />
+        <Route path="/login" element={session ? <Navigate to={session.user.role === "admin" ? "/admin" : "/dashboard"} replace /> : <AuthPage onAuthenticated={onAuthenticated} onLanguageChange={updateLanguage} />} />
         <Route path="/forgot-password" element={session ? <Navigate to="/dashboard" replace /> : <ForgotPasswordPage onLanguageChange={updateLanguage} />} />
-        <Route path="/register" element={session ? <Navigate to="/dashboard" replace /> : <AuthPage register onAuthenticated={onAuthenticated} onLanguageChange={updateLanguage} />} />
-        <Route path="/dashboard" element={<Protected session={session}><Dashboard session={session} visitReminder={visitReminder} onLogout={logout} onLanguageChange={updateLanguage} /></Protected>} />
+        <Route path="/register" element={session ? <Navigate to={session.user.role === "admin" ? "/admin" : "/dashboard"} replace /> : <AuthPage register onAuthenticated={onAuthenticated} onLanguageChange={updateLanguage} />} />
+        <Route path="/admin" element={<Protected session={session} role="admin"><AdminPage session={session} onLogout={logout} onLanguageChange={updateLanguage} /></Protected>} />
+        <Route path="/dashboard" element={<Protected session={session}>{session?.user?.role === "admin" ? <Navigate to="/admin" replace /> : <Dashboard session={session} visitReminder={visitReminder} onLogout={logout} onLanguageChange={updateLanguage} />}</Protected>} />
         <Route path="/settings" element={<Protected session={session}><SettingsPage session={session} visitReminder={visitReminder} remindersEnabled={remindersEnabled} onReminderPreferenceChange={updateReminderPreference} onSessionUpdate={updateSession} onLogout={logout} onLanguageChange={updateLanguage} /></Protected>} />
         <Route path="/messages" element={<Protected session={session}><MessagesPage session={session} visitReminder={visitReminder} onLogout={logout} onLanguageChange={updateLanguage} /></Protected>} />
         <Route path="/health-records" element={<Protected session={session}><HealthRecordsPage session={session} visitReminder={visitReminder} onLogout={logout} onLanguageChange={updateLanguage} /></Protected>} />
@@ -813,6 +814,232 @@ function SettingsPage({ session, visitReminder, remindersEnabled, onReminderPref
   );
 }
 
+function AdminPage({ session, onLogout, onLanguageChange }) {
+  const [overview, setOverview] = useState(null);
+  const [users, setUsers] = useState({ data: [], pagination: null });
+  const [mothers, setMothers] = useState({ data: [], pagination: null });
+  const [missedVisits, setMissedVisits] = useState({ data: [], pagination: null });
+  const [codeConfigured, setCodeConfigured] = useState(false);
+  const [userPage, setUserPage] = useState(1);
+  const [motherPage, setMotherPage] = useState(1);
+  const [missedPage, setMissedPage] = useState(1);
+  const [roleFilter, setRoleFilter] = useState("all");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [actionMessage, setActionMessage] = useState("");
+  const [savingUser, setSavingUser] = useState(false);
+  const [savingUserId, setSavingUserId] = useState("");
+  const [savingCode, setSavingCode] = useState(false);
+  const [nurseRegistrationCode, setNurseRegistrationCode] = useState("");
+  const [userForm, setUserForm] = useState({ role: "nurse", name: "", email: "", phone: "", password: "", dueDate: "" });
+  const [codeMessage, setCodeMessage] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    const userQuery = new URLSearchParams({ page: String(userPage), limit: "10" });
+    if (roleFilter !== "all") userQuery.set("role", roleFilter);
+    const motherQuery = new URLSearchParams({ page: String(motherPage), limit: "10" });
+    const missedQuery = new URLSearchParams({ page: String(missedPage), limit: "10" });
+    try {
+      const [overviewResult, usersResult, mothersResult, missedResult, settingsResult] = await Promise.all([
+        api("/admin/overview", { token: session.token }),
+        api(`/admin/users?${userQuery}`, { token: session.token }),
+        api(`/admin/mothers?${motherQuery}`, { token: session.token }),
+        api(`/admin/missed-visits?${missedQuery}`, { token: session.token }),
+        api("/admin/settings", { token: session.token })
+      ]);
+      setOverview(overviewResult);
+      setUsers(usersResult);
+      setMothers(mothersResult);
+      setMissedVisits(missedResult);
+      setCodeConfigured(settingsResult.nurseRegistrationCodeConfigured);
+    } catch (reason) {
+      setError(reason.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [missedPage, motherPage, roleFilter, session.token, userPage]);
+  useEffect(() => { load(); }, [load]);
+
+  const createUser = async (event) => {
+    event.preventDefault();
+    setActionError("");
+    setActionMessage("");
+    setSavingUser(true);
+    const body = { ...userForm };
+    if (userForm.role !== "mother") delete body.dueDate;
+    try {
+      await api("/admin/users", { token: session.token, method: "POST", body: JSON.stringify(body) });
+      setUserForm({ role: "nurse", name: "", email: "", phone: "", password: "", dueDate: "" });
+      setActionMessage(`${userForm.role === "nurse" ? "Nurse" : "Mother"} account registered.`);
+      if (userPage !== 1) setUserPage(1);
+      else await load();
+    } catch (reason) {
+      setActionError(reason.message);
+    } finally {
+      setSavingUser(false);
+    }
+  };
+
+  const updateUser = async (user, updates) => {
+    setActionError("");
+    setActionMessage("");
+    setSavingUserId(user._id);
+    try {
+      const response = await api(`/admin/users/${user._id}`, {
+        token: session.token,
+        method: "PATCH",
+        body: JSON.stringify(updates)
+      });
+      setUsers((current) => ({
+        ...current,
+        data: current.data.map((item) => item._id === user._id ? { ...item, ...response.user, _id: user._id } : item)
+      }));
+      setActionMessage(`${response.user.name}'s account was updated.`);
+      await load();
+    } catch (reason) {
+      setActionError(reason.message);
+    } finally {
+      setSavingUserId("");
+    }
+  };
+
+  const saveRegistrationCode = async (event) => {
+    event.preventDefault();
+    setActionError("");
+    setCodeMessage("");
+    setSavingCode(true);
+    try {
+      await api("/admin/settings/nurse-registration-code", {
+        token: session.token,
+        method: "PUT",
+        body: JSON.stringify({ nurseRegistrationCode })
+      });
+      setCodeConfigured(true);
+      setCodeMessage("Invite code saved. Share it directly with authorized nurses; it cannot be viewed again after leaving this page.");
+    } catch (reason) {
+      setActionError(reason.message);
+    } finally {
+      setSavingCode(false);
+    }
+  };
+
+  const stats = overview?.summary;
+  const visitReminder = { loading: false, error: "", visit: null, visits: [] };
+  const accountIsActive = (user) => user.isActive !== false;
+
+  return (
+    <LocalizedMarkup>
+    <div className={`dashboard-layout dashboard-role-${session.user.role}`}>
+      <DashboardSidebar session={session} activePage="admin" missedCount={0} onLogout={onLogout} />
+      <div className="dashboard-main">
+        <Header session={session} onLogout={onLogout} visitReminder={visitReminder} dashboard onLanguageChange={onLanguageChange} />
+        <div className="dashboard-workspace">
+          <main className="page-wrap dashboard-page admin-page">
+            <div className="page-heading dashboard-heading">
+              <div><span className="eyebrow">SYSTEM ADMINISTRATION</span><h1>Administrator dashboard</h1><p>Manage accounts, monitor maternal care, and update system access settings.</p></div>
+              <button className="button button-outline button-small" type="button" disabled={loading} onClick={load}>Refresh data</button>
+            </div>
+            {error && <ErrorBanner>{error}</ErrorBanner>}
+            {actionError && <ErrorBanner>{actionError}</ErrorBanner>}
+            {actionMessage && <p className="settings-success" role="status">{actionMessage}</p>}
+            {loading && !stats ? <LoadingState text="Loading system overview..." /> : stats && <>
+              <section className="summary-grid dashboard-summary-grid admin-summary-grid" id="admin-reports" aria-label="System-wide reports">
+                <SummaryCard label="REGISTERED USERS" value={stats.totalUsers} caption={`${stats.activeUsers} active · ${stats.inactiveUsers} inactive`} icon="♙" />
+                <SummaryCard label="NURSE ACCOUNTS" value={stats.nurseAccounts} caption="All registered nurses" icon="✚" />
+                <SummaryCard label="MOTHER ACCOUNTS" value={stats.motherAccounts} caption={`${stats.motherRecords} care records`} icon="♡" tone="pink" />
+                <SummaryCard label="MISSED VISITS" value={stats.missedVisits} caption="Past visits not completed" icon="!" tone="peach" />
+                <SummaryCard label="COMPLETED VISITS" value={stats.completedVisits} caption="Visits logged by care teams" icon="✓" />
+                <SummaryCard label="UPCOMING VISITS" value={stats.upcomingVisits} caption="Scheduled from today onward" icon="▦" tone="lavender" />
+              </section>
+
+              <section className="admin-panel" aria-labelledby="admin-missed-title">
+                <div className="admin-panel-heading"><div><h2 id="admin-missed-title">Missed visits to monitor</h2><p>Showing the earliest outstanding visits.</p></div><strong>{stats.missedVisits} total</strong></div>
+                {missedVisits.data.length === 0 ? <p className="admin-empty">There are no missed visits to follow up.</p> : (
+                  <div className="admin-table-wrap"><table className="admin-table">
+                    <thead><tr><th>Mother</th><th>Visit</th><th>Scheduled date</th><th>Phone</th></tr></thead>
+                    <tbody>{missedVisits.data.map((visit) => <tr key={visit._id}>
+                      <td><Link to={`/mothers/${visit.motherId._id}`}>{visit.motherId.name}</Link></td>
+                      <td>Visit {visit.visitNo}</td><td>{formatDate(visit.visitDate)}</td><td>{visit.motherId.phone}</td>
+                    </tr>)}</tbody>
+                  </table></div>
+                )}
+                {!loading && missedVisits.pagination?.pages > 1 && <div className="pagination dashboard-pagination"><button className="button button-outline" disabled={missedPage === 1} onClick={() => setMissedPage(missedPage - 1)}>← Previous</button><span>{`Page ${missedPage} of ${missedVisits.pagination.pages}`}</span><button className="button button-outline" disabled={missedPage === missedVisits.pagination.pages} onClick={() => setMissedPage(missedPage + 1)}>Next →</button></div>}
+              </section>
+
+              <section className="admin-panel" id="admin-users" aria-labelledby="admin-users-title">
+                <div className="admin-panel-heading"><div><h2 id="admin-users-title">Manage user accounts</h2><p>Register nurse or mother accounts, assign roles, and activate or deactivate access.</p></div>
+                  <label className="admin-filter"><span>Filter role</span><select value={roleFilter} onChange={(event) => { setRoleFilter(event.target.value); setUserPage(1); }}><option value="all">All roles</option><option value="admin">Admin</option><option value="nurse">Nurse</option><option value="mother">Mother</option></select></label>
+                </div>
+                <form className="admin-create-form" onSubmit={createUser}>
+                  <h3>Register an account</h3>
+                  <div className="admin-form-grid">
+                    <label className="field"><span>Role</span><select value={userForm.role} onChange={(event) => setUserForm({ ...userForm, role: event.target.value })}><option value="nurse">Nurse</option><option value="mother">Mother</option></select></label>
+                    <Field label="Full name" value={userForm.name} onChange={(name) => setUserForm({ ...userForm, name })} minLength="2" maxLength="100" required />
+                    <Field label="Email address" type="email" value={userForm.email} onChange={(email) => setUserForm({ ...userForm, email })} maxLength="254" required />
+                    <Field label="Phone number (include country code)" type="tel" placeholder="+250790000000" value={userForm.phone} onChange={(phone) => setUserForm({ ...userForm, phone })} required />
+                    <Field label="Initial password" type="password" value={userForm.password} onChange={(password) => setUserForm({ ...userForm, password })} minLength="8" maxLength="100" required />
+                    {userForm.role === "mother" && <Field label="Expected due date" type="date" value={userForm.dueDate} onChange={(dueDate) => setUserForm({ ...userForm, dueDate })} required />}
+                  </div>
+                  <button className="button button-primary button-small" type="submit" disabled={savingUser}>{savingUser ? "Registering..." : "Register account"}</button>
+                </form>
+                {users.data.length === 0 ? <p className="admin-empty">No accounts match this filter.</p> : (
+                  <div className="admin-table-wrap"><table className="admin-table">
+                    <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Access</th></tr></thead>
+                    <tbody>{users.data.map((user) => {
+                      const isSelf = user._id === session.user.id;
+                      const isSaving = savingUserId === user._id;
+                      return <tr key={user._id}>
+                        <td>{user.name}{isSelf && <small className="admin-self-label">You</small>}</td>
+                        <td>{user.email}</td>
+                        <td><select aria-label={`Role for ${user.name}`} title={user.role !== "mother" && !user.hasCarePlan ? "Create a mother account with a due date before assigning the mother role." : undefined} value={user.role} disabled={isSelf || isSaving} onChange={(event) => updateUser(user, { role: event.target.value })}>
+                          <option value="admin">Admin</option><option value="nurse">Nurse</option><option value="mother" disabled={user.role !== "mother" && !user.hasCarePlan}>Mother</option>
+                        </select></td>
+                        <td><span className={`admin-status ${accountIsActive(user) ? "active" : "inactive"}`}>{accountIsActive(user) ? "Active" : "Inactive"}</span></td>
+                        <td><button className="button button-outline button-small" type="button" disabled={isSelf || isSaving} onClick={() => updateUser(user, { isActive: !accountIsActive(user) })}>{isSaving ? "Saving..." : accountIsActive(user) ? "Deactivate" : "Activate"}</button></td>
+                      </tr>;
+                    })}</tbody>
+                  </table></div>
+                )}
+                {!loading && users.pagination?.pages > 1 && <div className="pagination dashboard-pagination"><button className="button button-outline" disabled={userPage === 1} onClick={() => setUserPage(userPage - 1)}>← Previous</button><span>{`Page ${userPage} of ${users.pagination.pages}`}</span><button className="button button-outline" disabled={userPage === users.pagination.pages} onClick={() => setUserPage(userPage + 1)}>Next →</button></div>}
+              </section>
+
+              <section className="admin-panel" id="admin-mothers" aria-labelledby="admin-mothers-title">
+                <div className="admin-panel-heading"><div><h2 id="admin-mothers-title">Monitor mothers</h2><p>Registered care records and their account access status.</p></div><strong>{mothers.pagination?.total ?? 0} records</strong></div>
+                {mothers.data.length === 0 ? <p className="admin-empty">No mother records are registered yet.</p> : (
+                  <div className="admin-table-wrap"><table className="admin-table">
+                    <thead><tr><th>Mother</th><th>Due date</th><th>Phone</th><th>Account</th><th>Care plan</th></tr></thead>
+                    <tbody>{mothers.data.map((mother) => <tr key={mother._id}>
+                      <td>{mother.name}</td><td>{formatDate(mother.dueDate)}</td><td>{mother.phone}</td>
+                      <td>{mother.userId ? <>{mother.userId.email}<span className={`admin-status ${mother.userId.isActive === false ? "inactive" : "active"}`}>{mother.userId.isActive === false ? "Inactive" : "Active"}</span></> : "No login account"}</td>
+                      <td><Link className="admin-view-link" to={`/mothers/${mother._id}`}>View record →</Link></td>
+                    </tr>)}</tbody>
+                  </table></div>
+                )}
+                {!loading && mothers.pagination?.pages > 1 && <div className="pagination dashboard-pagination"><button className="button button-outline" disabled={motherPage === 1} onClick={() => setMotherPage(motherPage - 1)}>← Previous</button><span>{`Page ${motherPage} of ${mothers.pagination.pages}`}</span><button className="button button-outline" disabled={motherPage === mothers.pagination.pages} onClick={() => setMotherPage(motherPage + 1)}>Next →</button></div>}
+              </section>
+
+              <section className="admin-panel" id="admin-settings" aria-labelledby="admin-settings-title">
+                <div className="admin-panel-heading"><div><h2 id="admin-settings-title">System settings</h2><p>Only administrators can change the nurse invite code.</p></div><span className={`admin-status ${codeConfigured ? "active" : "inactive"}`}>{codeConfigured ? "Invite code configured" : "Invite code not set"}</span></div>
+                <form className="admin-code-form" onSubmit={saveRegistrationCode}>
+                  <p>{codeConfigured ? "Forgot the current code? Set a new one here. The old code will stop working immediately." : "Create a code and share it directly with authorized nurses so they can register."}</p>
+                  <Field label="New nurse invite code" type="password" autoComplete="new-password" value={nurseRegistrationCode} onChange={setNurseRegistrationCode} minLength="8" maxLength="128" required />
+                  <button className="button button-primary button-small" type="submit" disabled={savingCode}>{savingCode ? "Saving..." : codeConfigured ? "Replace invite code" : "Create invite code"}</button>
+                  {codeMessage && <p className="settings-success" role="status">{codeMessage}</p>}
+                </form>
+              </section>
+            </>}
+          </main>
+          <ContactStrip />
+        </div>
+      </div>
+    </div>
+    </LocalizedMarkup>
+  );
+}
+
 function HealthRecordsPage({ session, visitReminder, onLogout, onLanguageChange }) {
   const [result, setResult] = useState({ loading: true, error: "", data: [], pagination: null });
   const [page, setPage] = useState(1);
@@ -946,27 +1173,37 @@ function whatsAppUrl(phone, message = "") {
 
 function DashboardSidebar({ session, activePage, missedCount, onLogout }) {
   const isNurse = session.user.role === "nurse";
+  const isAdmin = session.user.role === "admin";
+  const isAdminPage = window.location.pathname === "/admin";
   const isDashboard = activePage === "dashboard";
   const carePlansPath = isDashboard ? "#care-plans" : "/dashboard#care-plans";
   const appointmentsPath = isDashboard ? `#${isNurse ? "follow-ups" : "appointments"}` : `/dashboard#${isNurse ? "follow-ups" : "appointments"}`;
   return (
     <LocalizedMarkup>
     <aside className="dashboard-sidebar">
-      <Link to="/dashboard" className="sidebar-brand">
+      <Link to={isAdmin ? "/admin" : "/dashboard"} className="sidebar-brand">
         <span className="sidebar-brand-mark" aria-hidden="true">♡</span>
         <span>Maternal Health<small>Visit Reminder</small></span>
       </Link>
       <nav className="sidebar-nav" aria-label="Dashboard navigation">
-        <Link className={`sidebar-link${activePage === "dashboard" ? " active" : ""}`} to="/dashboard"><span aria-hidden="true">⌂</span>Dashboard</Link>
-        {isDashboard
-          ? <a className="sidebar-link" href={carePlansPath}><span aria-hidden="true">▤</span>{isNurse ? "Mother care plans" : "My care plan"}</a>
-          : <Link className="sidebar-link" to={carePlansPath}><span aria-hidden="true">▤</span>{isNurse ? "Mother care plans" : "My care plan"}</Link>}
-        {isDashboard
-          ? <a className="sidebar-link" href={appointmentsPath}><span aria-hidden="true">▦</span>Appointments{isNurse && missedCount > 0 && <span className="sidebar-badge">{missedCount}</span>}</a>
-          : <Link className="sidebar-link" to={appointmentsPath}><span aria-hidden="true">▦</span>Appointments{isNurse && missedCount > 0 && <span className="sidebar-badge">{missedCount}</span>}</Link>}
-        <Link className={`sidebar-link${activePage === "health-records" ? " active" : ""}`} to="/health-records"><span aria-hidden="true">▣</span>Health Records</Link>
-        <Link className={`sidebar-link${activePage === "messages" ? " active" : ""}`} to="/messages"><span aria-hidden="true">✉</span>Messages</Link>
-        <Link className={`sidebar-link${activePage === "settings" ? " active" : ""}`} to="/settings"><span aria-hidden="true">⚙</span>Settings</Link>
+        {isAdmin ? <>
+          <Link className={`sidebar-link${activePage === "admin" ? " active" : ""}`} to="/admin"><span aria-hidden="true">⌂</span>Admin overview</Link>
+          <a className="sidebar-link" href={isAdminPage ? "#admin-users" : "/admin"}><span aria-hidden="true">♙</span>User accounts</a>
+          <a className="sidebar-link" href={isAdminPage ? "#admin-mothers" : "/admin"}><span aria-hidden="true">♡</span>Mothers</a>
+          <a className="sidebar-link" href={isAdminPage ? "#admin-reports" : "/admin"}><span aria-hidden="true">▦</span>Reports</a>
+          <a className="sidebar-link" href={isAdminPage ? "#admin-settings" : "/admin"}><span aria-hidden="true">⚙</span>System settings</a>
+        </> : <>
+          <Link className={`sidebar-link${activePage === "dashboard" ? " active" : ""}`} to="/dashboard"><span aria-hidden="true">⌂</span>Dashboard</Link>
+          {isDashboard
+            ? <a className="sidebar-link sidebar-link-care-plans" href={carePlansPath}><span aria-hidden="true">▤</span>{isNurse ? "Mother care plans" : "My care plan"}</a>
+            : <Link className="sidebar-link sidebar-link-care-plans" to={carePlansPath}><span aria-hidden="true">▤</span>{isNurse ? "Mother care plans" : "My care plan"}</Link>}
+          {isDashboard
+            ? <a className="sidebar-link sidebar-link-appointments" href={appointmentsPath}><span aria-hidden="true">▦</span>Appointments{isNurse && missedCount > 0 && <span className="sidebar-badge">{missedCount}</span>}</a>
+            : <Link className="sidebar-link sidebar-link-appointments" to={appointmentsPath}><span aria-hidden="true">▦</span>Appointments{isNurse && missedCount > 0 && <span className="sidebar-badge">{missedCount}</span>}</Link>}
+          <Link className={`sidebar-link${activePage === "health-records" ? " active" : ""}`} to="/health-records"><span aria-hidden="true">▣</span>Health Records</Link>
+          <Link className={`sidebar-link${activePage === "messages" ? " active" : ""}`} to="/messages"><span aria-hidden="true">✉</span>Messages</Link>
+          <Link className={`sidebar-link${activePage === "settings" ? " active" : ""}`} to="/settings"><span aria-hidden="true">⚙</span>Settings</Link>
+        </>}
         <button className="sidebar-link sidebar-menu-logout" type="button" onClick={onLogout}><span aria-hidden="true">⇥</span>Log out</button>
       </nav>
       <div className="sidebar-bottom">

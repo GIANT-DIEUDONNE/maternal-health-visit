@@ -26,7 +26,8 @@ if (process.env.NURSE_EMAIL && process.env.NURSE_PASSWORD) {
     name: process.env.NURSE_NAME || "Clinic Nurse",
     email: process.env.NURSE_EMAIL.toLowerCase(),
     passwordHash: await bcrypt.hash(process.env.NURSE_PASSWORD, 12),
-    role: "nurse"
+    role: "nurse",
+    isActive: true
   };
   if (process.env.NURSE_PHONE) {
     if (!/^\+[1-9]\d{7,14}$/.test(process.env.NURSE_PHONE)) {

@@ -19,3 +19,9 @@ test("translated templates preserve dynamic values", () => {
 test("untranslated dynamic content safely falls back to its original text", () => {
   assert.equal(translateText("A name not in the dictionary", "fr"), "A name not in the dictionary");
 });
+
+test("administrator dashboard labels and dynamic counts are translated", () => {
+  assert.equal(translateText("Administrator dashboard", "fr"), "Tableau de bord administrateur");
+  assert.equal(translateText("5 active · 2 inactive", "rw"), "5 barakora · 2 ntibakora");
+  assert.equal(translateText("3 care records", "fr"), "3 dossiers de soins");
+});

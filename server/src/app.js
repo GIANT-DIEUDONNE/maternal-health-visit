@@ -5,6 +5,7 @@ import mongoose from "mongoose";
 import { z } from "zod";
 import { User, Mother, Visit } from "./models.js";
 import { createAuthRouter, requireAuth, requireRole } from "./auth.js";
+import { createAdminRouter } from "./admin.js";
 import { createWhatsAppWebhook } from "./whatsapp.js";
 import { calculateVisitDates, canLogVisit, isMissed, startOfUtcDay } from "./schedule.js";
 
@@ -42,6 +43,7 @@ export function createApp() {
 
   app.get("/api/health", (_req, res) => res.json({ status: "ok" }));
   app.use("/api/auth", createAuthRouter(express, bcrypt));
+  app.use("/api/admin", createAdminRouter(express, bcrypt));
   app.use("/api/webhooks/whatsapp", createWhatsAppWebhook(express));
 
   app.get("/api/mothers", requireAuth, async (req, res, next) => {
@@ -187,7 +189,7 @@ export function createApp() {
     }
   });
 
-  app.get("/api/analytics/missed-visits", requireAuth, requireRole("nurse"), async (_req, res, next) => {
+  app.get("/api/analytics/missed-visits", requireAuth, requireRole("nurse", "admin"), async (_req, res, next) => {
     try {
       const now = new Date();
       const missed = await Visit.find({ visitDate: { $lt: startOfUtcDay(now) }, completedAt: null }).populate("motherId", "name phone dueDate").lean();

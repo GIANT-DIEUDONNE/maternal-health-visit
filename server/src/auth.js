@@ -1,6 +1,6 @@
 import jwt from "jsonwebtoken";
 import { z } from "zod";
-import { User, Mother, Visit } from "./models.js";
+import { User, Mother, SystemSetting, Visit } from "./models.js";
 import { calculateVisitDates } from "./schedule.js";
 
 const phoneSchema = z.string().trim().regex(/^\+[1-9]\d{7,14}$/, "Enter an international phone number starting with + and the country code.");
@@ -106,8 +106,9 @@ export async function requireAuth(req, res, next) {
     return res.status(401).json({ error: "Invalid or expired access token." });
   }
   try {
-    const user = await User.findById(claims.sub).select("role authVersion");
+    const user = await User.findById(claims.sub).select("role authVersion isActive");
     if (!user) return res.status(401).json({ error: "Account is no longer available." });
+    if (user.isActive === false) return res.status(401).json({ error: "This account has been deactivated." });
     if ((claims.authVersion || 0) !== user.authVersion) return res.status(401).json({ error: "Invalid or expired access token." });
     req.auth = { ...claims, role: user.role };
     next();
@@ -136,15 +137,16 @@ export function createAuthRouter(express, bcrypt) {
     if (role === "mother" && !dueDate) {
       return res.status(400).json({ error: "Mother registration requires a due date." });
     }
-    if (role === "nurse") {
-      if (!process.env.NURSE_REGISTRATION_CODE) {
-        return res.status(503).json({ error: "Nurse registration is not configured." });
-      }
-      if (nurseRegistrationCode !== process.env.NURSE_REGISTRATION_CODE) {
-        return res.status(403).json({ error: "A valid Nurse registration code is required." });
-      }
-    }
     try {
+      if (role === "nurse") {
+        const settings = await SystemSetting.findOne({ key: "system" }).select("nurseRegistrationCodeHash");
+        if (!settings?.nurseRegistrationCodeHash) {
+          return res.status(503).json({ error: "Nurse registration is not configured." });
+        }
+        if (!(await bcrypt.compare(nurseRegistrationCode || "", settings.nurseRegistrationCodeHash))) {
+          return res.status(403).json({ error: "A valid Nurse registration code is required." });
+        }
+      }
       const email = submittedEmail.toLowerCase();
       if (await User.exists({ email })) return res.status(400).json({ error: "An account with this email already exists." });
       if (role === "mother" && dueDate <= new Date()) return res.status(400).json({ error: "Due date must be in the future." });
@@ -177,6 +179,7 @@ export function createAuthRouter(express, bcrypt) {
       if (!user || !(await bcrypt.compare(input.data.password, user.passwordHash))) {
         return res.status(401).json({ error: "Email or password is incorrect." });
       }
+      if (user.isActive === false) return res.status(403).json({ error: "This account has been deactivated. Contact an administrator." });
       res.json({
         token: issueToken(user),
         user: { id: user.id, name: user.name, email: user.email, role: user.role, preferredLanguage: user.preferredLanguage || "en" }

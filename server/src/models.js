@@ -5,7 +5,8 @@ const userSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     passwordHash: { type: String, required: true },
-    role: { type: String, enum: ["nurse", "mother"], required: true },
+    role: { type: String, enum: ["admin", "nurse", "mother"], required: true },
+    isActive: { type: Boolean, default: true },
     phone: { type: String, trim: true },
     preferredLanguage: { type: String, enum: ["en", "rw", "fr"], default: "en" },
     authVersion: { type: Number, default: 0 }
@@ -36,6 +37,15 @@ const visitSchema = new mongoose.Schema(
 );
 visitSchema.index({ motherId: 1, visitNo: 1 }, { unique: true });
 
+const systemSettingSchema = new mongoose.Schema(
+  {
+    key: { type: String, required: true, unique: true },
+    nurseRegistrationCodeHash: { type: String, default: "" }
+  },
+  { timestamps: true }
+);
+
 export const User = mongoose.models.User || mongoose.model("User", userSchema);
 export const Mother = mongoose.models.Mother || mongoose.model("Mother", motherSchema);
 export const Visit = mongoose.models.Visit || mongoose.model("Visit", visitSchema);
+export const SystemSetting = mongoose.models.SystemSetting || mongoose.model("SystemSetting", systemSettingSchema);

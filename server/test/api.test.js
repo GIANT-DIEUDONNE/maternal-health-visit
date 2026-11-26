@@ -1,17 +1,19 @@
 import { after, before, beforeEach, test } from "node:test";
 import assert from "node:assert/strict";
+import bcrypt from "bcryptjs";
 import mongoose from "mongoose";
 import { MongoMemoryServer } from "mongodb-memory-server";
 import request from "supertest";
 import { createApp } from "../src/app.js";
 import { issueToken } from "../src/auth.js";
-import { Mother, User, Visit } from "../src/models.js";
+import { Mother, SystemSetting, User, Visit } from "../src/models.js";
 import { calculateVisitDates, isMissed } from "../src/schedule.js";
 
 process.env.JWT_SECRET = "test-secret-for-maternal-health";
-process.env.NURSE_REGISTRATION_CODE = "test-nurse-registration-code";
+const testNurseRegistrationCode = "test-nurse-registration-code";
 let mongo;
 let app;
+let adminToken;
 let nurseToken;
 let motherToken;
 let mother;
@@ -23,11 +25,17 @@ before(async () => {
 });
 
 beforeEach(async () => {
-  await Promise.all([User.deleteMany({}), Mother.deleteMany({}), Visit.deleteMany({})]);
+  await Promise.all([User.deleteMany({}), Mother.deleteMany({}), Visit.deleteMany({}), SystemSetting.deleteMany({})]);
+  const admin = await User.create({ name: "Test Admin", email: "admin@test.local", passwordHash: "hash", role: "admin" });
   const nurse = await User.create({ name: "Test Nurse", email: "nurse@test.local", passwordHash: "hash", role: "nurse" });
   const account = await User.create({ name: "Test Mother", email: "mother@test.local", passwordHash: "hash", role: "mother" });
+  adminToken = issueToken(admin);
   nurseToken = issueToken(nurse);
   motherToken = issueToken(account);
+  await SystemSetting.create({
+    key: "system",
+    nurseRegistrationCodeHash: await bcrypt.hash(testNurseRegistrationCode, 4)
+  });
   const dueDate = new Date(Date.now() + 250 * 86400000);
   mother = await Mother.create({ name: account.name, phone: "5551234567", dueDate, userId: account.id });
   await Visit.insertMany(calculateVisitDates(dueDate).map((visit) => ({ ...visit, motherId: mother.id })));
@@ -75,12 +83,168 @@ test("nurse registration requires the configured invite code and saves the nurse
     email: "registered-nurse@test.local",
     password: "password123",
     phone: "+15551234567",
-    nurseRegistrationCode: process.env.NURSE_REGISTRATION_CODE
+    nurseRegistrationCode: testNurseRegistrationCode
   });
   assert.equal(response.status, 201);
   assert.equal(response.body.user.role, "nurse");
   assert.ok(await User.exists({ email: "registered-nurse@test.local", role: "nurse", phone: "+15551234567" }));
   assert.equal(await Mother.countDocuments(), 1);
+});
+
+test("only administrators can replace the nurse invite code and the previous code stops working", async () => {
+  const denied = await request(app).put("/api/admin/settings/nurse-registration-code")
+    .set("Authorization", `Bearer ${nurseToken}`)
+    .send({ nurseRegistrationCode: "replacement-nurse-code" });
+  assert.equal(denied.status, 403);
+
+  const saved = await request(app).put("/api/admin/settings/nurse-registration-code")
+    .set("Authorization", `Bearer ${adminToken}`)
+    .send({ nurseRegistrationCode: "replacement-nurse-code" });
+  assert.equal(saved.status, 200);
+  assert.equal(saved.body.nurseRegistrationCodeConfigured, true);
+
+  const oldCode = await request(app).post("/api/auth/register").send({
+    role: "nurse",
+    name: "Old Code Nurse",
+    email: "old-code@test.local",
+    password: "password123",
+    phone: "+15551234567",
+    nurseRegistrationCode: testNurseRegistrationCode
+  });
+  assert.equal(oldCode.status, 403);
+
+  const newCode = await request(app).post("/api/auth/register").send({
+    role: "nurse",
+    name: "New Code Nurse",
+    email: "new-code@test.local",
+    password: "password123",
+    phone: "+15551234567",
+    nurseRegistrationCode: "replacement-nurse-code"
+  });
+  assert.equal(newCode.status, 201);
+});
+
+test("administrator can register a mother account and create its care schedule", async () => {
+  const dueDate = new Date(Date.now() + 260 * 86400000);
+  const response = await request(app).post("/api/admin/users")
+    .set("Authorization", `Bearer ${adminToken}`)
+    .send({
+      role: "mother",
+      name: "Admin Registered Mother",
+      email: "admin-mother@test.local",
+      password: "password123",
+      phone: "+15551234567",
+      dueDate: dueDate.toISOString()
+    });
+
+  assert.equal(response.status, 201);
+  assert.equal(response.body.user.role, "mother");
+  const user = await User.findById(response.body.user.id);
+  const carePlan = await Mother.findOne({ userId: user.id });
+  assert.ok(carePlan);
+  assert.equal(await Visit.countDocuments({ motherId: carePlan.id }), 5);
+});
+
+test("administrator role and activation changes revoke sessions immediately", async () => {
+  const created = await request(app).post("/api/admin/users")
+    .set("Authorization", `Bearer ${adminToken}`)
+    .send({
+      role: "nurse",
+      name: "Managed Nurse",
+      email: "managed-nurse@test.local",
+      password: "password123",
+      phone: "+15551234567"
+    });
+  assert.equal(created.status, 201);
+  const user = await User.findById(created.body.user.id);
+  const userToken = issueToken(user);
+
+  const promoted = await request(app).patch(`/api/admin/users/${user.id}`)
+    .set("Authorization", `Bearer ${adminToken}`)
+    .send({ role: "admin" });
+  assert.equal(promoted.status, 200);
+  assert.equal(promoted.body.user.role, "admin");
+  const oldRoleSession = await request(app).get("/api/mothers")
+    .set("Authorization", `Bearer ${userToken}`);
+  assert.equal(oldRoleSession.status, 401);
+
+  const activeToken = issueToken(await User.findById(user.id));
+  const deactivated = await request(app).patch(`/api/admin/users/${user.id}`)
+    .set("Authorization", `Bearer ${adminToken}`)
+    .send({ isActive: false });
+  assert.equal(deactivated.status, 200);
+  assert.equal(deactivated.body.user.isActive, false);
+
+  const inactiveSession = await request(app).get("/api/mothers")
+    .set("Authorization", `Bearer ${activeToken}`);
+  assert.equal(inactiveSession.status, 401);
+
+  const login = await request(app).post("/api/auth/login")
+    .send({ email: "managed-nurse@test.local", password: "password123" });
+  assert.equal(login.status, 403);
+});
+
+test("administrator endpoints are restricted and admins cannot change their own role", async () => {
+  const anonymous = await request(app).get("/api/admin/overview");
+  assert.equal(anonymous.status, 401);
+
+  const nurseDenied = await request(app).get("/api/admin/overview")
+    .set("Authorization", `Bearer ${nurseToken}`);
+  assert.equal(nurseDenied.status, 403);
+
+  const motherDenied = await request(app).get("/api/admin/users")
+    .set("Authorization", `Bearer ${motherToken}`);
+  assert.equal(motherDenied.status, 403);
+
+  const publicAdminRegistration = await request(app).post("/api/auth/register").send({
+    role: "admin",
+    name: "Unapproved Admin",
+    email: "unapproved-admin@test.local",
+    password: "password123",
+    phone: "+15551234567"
+  });
+  assert.equal(publicAdminRegistration.status, 400);
+  assert.equal(await User.exists({ email: "unapproved-admin@test.local" }), null);
+
+  const selfDemotion = await request(app).patch(`/api/admin/users/${(await User.findOne({ role: "admin" })).id}`)
+    .set("Authorization", `Bearer ${adminToken}`)
+    .send({ role: "nurse" });
+  assert.equal(selfDemotion.status, 400);
+
+  const overview = await request(app).get("/api/admin/overview")
+    .set("Authorization", `Bearer ${adminToken}`);
+  assert.equal(overview.status, 200);
+  assert.equal(overview.body.summary.adminAccounts, 1);
+  assert.equal(overview.body.summary.nurseAccounts, 1);
+  assert.equal(overview.body.summary.motherAccounts, 1);
+});
+
+test("administrator reports monitor real missed visits and exclude sample records", async () => {
+  const actualMissedVisit = await Visit.findOne({ motherId: mother.id, visitNo: 1 });
+  actualMissedVisit.visitDate = new Date(Date.now() - 86400000);
+  await actualMissedVisit.save();
+  const sampleMother = await Mother.create({
+    name: "Sample Mother",
+    phone: "+15557654321",
+    dueDate: new Date(Date.now() + 250 * 86400000),
+    isSample: true
+  });
+  await Visit.create({ motherId: sampleMother.id, visitNo: 1, visitDate: new Date(Date.now() - 86400000) });
+
+  const overview = await request(app).get("/api/admin/overview")
+    .set("Authorization", `Bearer ${adminToken}`);
+  assert.equal(overview.body.summary.missedVisits, 1);
+
+  const missed = await request(app).get("/api/admin/missed-visits?page=1&limit=10")
+    .set("Authorization", `Bearer ${adminToken}`);
+  assert.equal(missed.status, 200);
+  assert.equal(missed.body.pagination.total, 1);
+  assert.equal(missed.body.data[0].motherId.name, mother.name);
+
+  const mothersList = await request(app).get("/api/admin/mothers?page=1&limit=10")
+    .set("Authorization", `Bearer ${adminToken}`);
+  assert.equal(mothersList.body.pagination.total, 1);
+  assert.notEqual(mothersList.body.data[0].name, "Sample Mother");
 });
 
 test("nurse can successfully log the first scheduled visit", async () => {
